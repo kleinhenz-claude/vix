@@ -482,7 +482,7 @@ function render(allRows, sourceLabel) {
 
   $('vixValue').textContent = vix.toFixed(2);
   const sign = dailyDelta >= 0 ? '+' : '';
-  $('vixSub').textContent = `${fmtDate(lastRow.date)} · ${sign}${dailyDelta.toFixed(2)} (${sign}${dailyDeltaPct.toFixed(2)}%)`;
+  $('vixSub').textContent = `${fmtDate(lastRow.date)} · ${sign}${dailyDelta.toFixed(2)}`;
 
   $('entropyValue').innerHTML = Hpct.toFixed(1) + '<span style="font-size:0.5em;opacity:0.6">%</span>';
   $('entropySub').textContent = `H = ${H.toFixed(4)} bits · Hmax = ${Hmax.toFixed(4)} bits`;
