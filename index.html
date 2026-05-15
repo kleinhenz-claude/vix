@@ -263,116 +263,15 @@
 <script>
 "use strict";
 
-const INLINE_CSV = `DATE,OPEN,HIGH,LOW,CLOSE
-01/02/2026,17.28,17.39,16.99,17.20
-01/05/2026,17.42,17.79,16.82,17.28
-01/06/2026,17.22,17.38,17.03,17.27
-01/07/2026,17.42,17.88,17.06,17.70
-01/08/2026,17.67,18.18,17.25,17.84
-01/09/2026,17.69,18.07,17.27,17.51
-01/12/2026,18.19,18.42,17.78,17.92
-01/13/2026,18.19,18.53,17.56,17.98
-01/14/2026,18.60,19.09,18.33,18.58
-01/15/2026,18.53,18.96,18.15,18.50
-01/16/2026,18.70,19.08,18.53,18.65
-01/19/2026,17.59,17.85,17.40,17.72
-01/20/2026,17.35,17.83,17.10,17.48
-01/21/2026,17.39,17.77,16.92,17.56
-01/22/2026,17.71,17.88,17.25,17.64
-01/23/2026,17.04,17.61,16.68,17.11
-01/26/2026,17.12,17.56,16.60,17.01
-01/27/2026,16.32,16.83,16.11,16.60
-01/28/2026,16.72,17.17,16.22,16.45
-01/29/2026,16.60,17.13,16.32,16.66
-01/30/2026,16.26,16.60,15.94,16.40
-02/02/2026,15.66,16.13,15.20,15.80
-02/03/2026,15.50,16.17,15.20,15.67
-02/04/2026,15.10,15.51,14.75,15.37
-02/05/2026,15.82,16.00,15.57,15.87
-02/06/2026,16.00,16.49,15.54,15.98
-02/09/2026,15.17,15.54,14.73,15.04
-02/10/2026,15.27,15.41,14.92,15.19
-02/11/2026,15.55,16.00,15.07,15.28
-02/12/2026,15.08,15.74,14.63,15.27
-02/13/2026,15.13,15.47,14.89,15.05
-02/16/2026,15.29,15.70,14.96,15.27
-02/17/2026,14.49,14.71,14.02,14.60
-02/18/2026,15.18,15.61,14.73,14.95
-02/19/2026,15.30,15.78,14.94,15.07
-02/20/2026,15.62,16.28,15.21,15.88
-02/23/2026,17.00,17.33,16.79,17.01
-02/24/2026,18.03,18.26,17.71,18.08
-02/25/2026,18.26,18.66,17.76,18.44
-02/26/2026,18.81,19.16,18.66,18.85
-02/27/2026,19.03,19.44,18.69,19.20
-03/02/2026,19.64,19.99,19.51,19.80
-03/03/2026,19.57,20.19,19.13,19.73
-03/04/2026,18.94,19.47,18.75,19.10
-03/05/2026,19.23,19.56,18.68,18.97
-03/06/2026,19.49,19.67,19.17,19.31
-03/09/2026,18.44,18.78,18.05,18.49
-03/10/2026,18.80,18.94,18.25,18.51
-03/11/2026,18.28,18.48,17.88,18.06
-03/12/2026,17.92,18.18,17.72,17.97
-03/13/2026,18.14,18.61,17.82,18.17
-03/16/2026,17.03,17.80,16.60,17.30
-03/17/2026,18.31,18.75,17.88,18.05
-03/18/2026,17.86,18.29,17.74,18.03
-03/19/2026,18.61,18.82,17.91,18.32
-03/20/2026,18.70,19.23,18.20,18.75
-03/23/2026,20.07,20.23,19.72,19.94
-03/24/2026,20.70,21.02,20.25,20.65
-03/25/2026,20.34,20.64,19.85,20.29
-03/26/2026,21.02,21.15,20.57,20.74
-03/27/2026,21.57,21.76,21.31,21.46
-03/30/2026,22.73,22.93,22.16,22.50
-03/31/2026,23.00,23.38,22.69,23.05
-04/01/2026,23.58,24.15,23.38,23.76
-04/02/2026,23.81,24.24,23.59,23.87
-04/03/2026,23.29,23.42,22.86,23.14
-04/06/2026,22.25,22.38,21.76,21.95
-04/07/2026,21.04,21.49,20.33,20.78
-04/08/2026,20.08,20.72,19.70,20.29
-04/09/2026,20.19,20.55,19.80,19.90
-04/10/2026,19.42,19.64,18.86,19.23
-04/13/2026,19.38,19.53,18.97,19.12
-04/14/2026,18.12,18.68,17.91,18.36
-04/15/2026,18.23,18.62,17.99,18.17
-04/16/2026,18.02,18.23,17.64,17.94
-04/17/2026,18.40,18.54,17.92,18.19
-04/20/2026,17.16,17.87,16.81,17.46
-04/21/2026,17.51,17.83,17.10,17.37
-04/22/2026,16.85,17.55,16.39,17.10
-04/23/2026,17.65,17.98,17.29,17.45
-04/24/2026,16.92,17.50,16.50,17.04
-04/27/2026,17.64,17.82,17.20,17.40
-04/28/2026,16.89,17.34,16.46,16.72
-04/29/2026,16.85,17.53,16.40,17.06
-04/30/2026,17.18,17.60,16.44,16.89
-05/01/2026,16.68,16.91,16.07,16.54
-05/04/2026,17.46,17.88,17.03,17.24
-05/05/2026,17.02,17.71,16.58,17.26
-05/06/2026,17.02,17.30,16.61,16.83
-05/07/2026,17.26,17.45,16.97,17.08
-05/08/2026,17.01,17.42,16.56,17.19`;
-
-// Mehrere Datenquellen, der Reihe nach probiert. Erste, die antwortet, gewinnt.
-// CBOE selbst zuerst (offiziell, niemals geblockt), dann CDNs, dann Proxies.
+// CSV-Fallback-Quellen (falls API nicht erreichbar)
 const TARGET_URL = 'https://raw.githubusercontent.com/datasets/finance-vix/main/data/vix-daily.csv';
 const TARGET_ENC = encodeURIComponent(TARGET_URL);
 
-const DATA_URLS = [
-  // 1. CBOE OFFIZIELL — Quelle aller Quellen, täglich aktualisiert, niemand blockt das
+const CSV_URLS = [
   'https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',
-  // 2. Lokale CSV (falls vorhanden, kein Netz nötig)
-  'vix-daily.csv',
-  // 3. jsDelivr CDN (zuverlässig, schneller als GitHub-Raw)
   'https://cdn.jsdelivr.net/gh/datasets/finance-vix@main/data/vix-daily.csv',
-  // 4. statically.io CDN
   'https://cdn.statically.io/gh/datasets/finance-vix/main/data/vix-daily.csv',
-  // 5. GitHub raw direkt
   TARGET_URL,
-  // 6. CORS-Proxies als letzte Notbremsen
   'https://corsproxy.io/?url=' + TARGET_ENC,
   'https://api.allorigins.win/raw?url=' + TARGET_ENC
 ];
@@ -506,46 +405,62 @@ async function tryFetch(url) {
   }
 }
 
-async function fetchCSV() {
+async function fetchFromYahooFinance() {
+  const url = 'https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=6mo';
+  const txt = await tryFetch(url);
+  const json = JSON.parse(txt);
+  if (json.chart.error) throw new Error('Yahoo API Fehler: ' + json.chart.error.description);
+  const result = json.chart.result[0];
+  const timestamps = result.timestamp;
+  const closes = result.indicators.quote[0].close;
+  const pad = n => String(n).padStart(2, '0');
+  const rows = timestamps.map((ts, i) => {
+    const d = new Date(ts * 1000);
+    const date = `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+    return { date, close: closes[i] };
+  }).filter(r => r.close !== null && !isNaN(r.close));
+  rows.sort((a, b) => a.date < b.date ? -1 : 1);
+  return rows;
+}
+
+async function fetchData() {
+  // 1. Yahoo Finance JSON API
   try {
-    const rows = parseCSV(INLINE_CSV);
+    console.log('[VIX] Versuche Yahoo Finance API...');
+    const rows = await fetchFromYahooFinance();
     if (rows.length >= WINDOW_SIZE) {
-      console.log('[VIX] ✓ Inline-Daten verwendet:', rows.length, 'Zeilen');
-      return { rows, sourceLabel: 'Eingebettete Daten', sourceUrl: '' };
+      console.log('[VIX] ✓ Yahoo Finance API:', rows.length, 'Zeilen');
+      return { rows, sourceLabel: 'Yahoo Finance API' };
     }
   } catch (e) {
-    console.warn('[VIX] Inline-Daten fehlgeschlagen:', e.message);
+    console.warn('[VIX] ✗ Yahoo Finance API fehlgeschlagen:', e.message);
   }
 
+  // 2. CSV-Fallbacks
   const errors = [];
-  for (const url of DATA_URLS) {
+  for (const url of CSV_URLS) {
     try {
-      console.log('[VIX] Versuche:', url);
-      const startTime = Date.now();
+      console.log('[VIX] Versuche CSV-Fallback:', url);
       const txt = await tryFetch(url);
-      const dur = Date.now() - startTime;
-      console.log('[VIX] ✓ Antwort in', dur, 'ms,', (txt.length/1024).toFixed(1), 'KB');
       const rows = parseCSV(txt);
-      if (rows.length === 0) throw new Error('Keine gültigen Datenzeilen gefunden');
-      console.log('[VIX] ✓ Quelle:', url, '→', rows.length, 'verwertbare Zeilen');
-      // Quellen-Label für UI
+      if (rows.length === 0) throw new Error('Keine gültigen Datenzeilen');
+      console.log('[VIX] ✓ CSV-Quelle:', url, '→', rows.length, 'Zeilen');
       let label = '';
-      if (url.includes('cboe.com')) label = 'CBOE (offiziell)';
-      else if (url.startsWith('vix-daily')) label = 'Lokale CSV';
+      if (url.includes('cboe.com')) label = 'CBOE CSV';
       else if (url.includes('jsdelivr')) label = 'jsDelivr CDN';
       else if (url.includes('statically')) label = 'Statically CDN';
       else if (url.includes('githubusercontent')) label = 'GitHub Raw';
       else if (url.includes('corsproxy')) label = 'CORSproxy.io';
       else if (url.includes('allorigins')) label = 'AllOrigins';
       else label = 'Externe Quelle';
-      return { rows, sourceLabel: label, sourceUrl: url };
+      return { rows, sourceLabel: label };
     } catch (e) {
       const msg = e.name === 'AbortError' ? 'Timeout (>10s)' : (e.message || e);
       console.warn('[VIX] ✗ Fehlgeschlagen:', url, '→', msg);
       errors.push(`${(url.split('/')[2] || 'lokal').substring(0,25)}: ${msg}`);
     }
   }
-  throw new Error('Alle ' + DATA_URLS.length + ' Datenquellen fehlgeschlagen.<br><br><strong>Details:</strong><br>' + errors.join('<br>'));
+  throw new Error('Alle Datenquellen fehlgeschlagen.<br><br><strong>Details:</strong><br>' + errors.join('<br>'));
 }
 
 function determineRegime(Hpct, vix) {
@@ -704,7 +619,7 @@ async function init() {
   }
 
   try {
-    const { rows, sourceLabel } = await fetchCSV();
+    const { rows, sourceLabel } = await fetchData();
     if (rows.length < WINDOW_SIZE) throw new Error(`Nur ${rows.length} Datenpunkte verfügbar (mindestens ${WINDOW_SIZE} nötig)`);
     render(rows, sourceLabel);
   } catch (err) {
