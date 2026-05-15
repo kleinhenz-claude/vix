@@ -254,7 +254,8 @@
   <footer>
     Primäre Datenquelle: <a href="https://www.cboe.com" target="_blank">CBOE</a> (offizielles VIX-Historikdataset, täglich aktualisiert)<br>
     Fallback-Quellen: jsDelivr CDN · Statically · GitHub · CORS-Proxies<br>
-    Methode: Shannon-Entropie nach Wegener · 21-Tage-Rolling, 6 Bins über % Tagesveränderung · Keine Anlageberatung
+    Methode: Shannon-Entropie nach Wegener · 21-Tage-Rolling, 6 Bins über % Tagesveränderung · Keine Anlageberatung<br>
+    Seite zuletzt geändert: <span id="pageModified"></span>
   </footer>
 
 </div>
@@ -614,6 +615,15 @@ async function init() {
 }
 
 init();
+
+(function() {
+  const el = document.getElementById('pageModified');
+  if (!el) return;
+  const d = new Date(document.lastModified);
+  if (isNaN(d.getTime())) return;
+  const pad = n => String(n).padStart(2, '0');
+  el.textContent = `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+})();
 </script>
 </body>
 </html>
