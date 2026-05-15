@@ -158,7 +158,7 @@
 <div class="container">
 
   <header>
-    <div class="header-label">// Live-Daten · GitHub VIX-Dataset</div>
+    <div class="header-label">// Live-Daten · CBOE &amp; CDN-Quellen</div>
     <h1>VIX<br>ENTROPIE</h1>
     <div class="header-sub">Frühwarnsystem für Marktstress nach <span>Thorsten Wegener</span></div>
     <div class="date-badge loading" id="statusBadge">Lade VIX-Daten...</div>
@@ -253,7 +253,7 @@
 
   <footer>
     Primäre Datenquelle: <a href="https://www.cboe.com" target="_blank">CBOE</a> (offizielles VIX-Historikdataset, täglich aktualisiert)<br>
-    Fallback-Quellen: jsDelivr CDN · Statically · GitHub · CORS-Proxies<br>
+    Fallback-Quellen: jsDelivr CDN · Statically CDN · GitHub Raw · CORS-Proxies<br>
     Methode: Shannon-Entropie nach Wegener · 21-Tage-Rolling, 6 Bins über % Tagesveränderung · Keine Anlageberatung
   </footer>
 
@@ -262,23 +262,20 @@
 <script>
 "use strict";
 
-// Mehrere Datenquellen, der Reihe nach probiert. Erste, die antwortet, gewinnt.
-// CBOE selbst zuerst (offiziell, niemals geblockt), dann CDNs, dann Proxies.
+// Mehrere Internet-Quellen, der Reihe nach probiert. Erste, die antwortet, gewinnt.
 const TARGET_URL = 'https://raw.githubusercontent.com/datasets/finance-vix/main/data/vix-daily.csv';
 const TARGET_ENC = encodeURIComponent(TARGET_URL);
 
 const DATA_URLS = [
-  // 1. CBOE OFFIZIELL — Quelle aller Quellen, täglich aktualisiert, niemand blockt das
+  // 1. CBOE OFFIZIELL — Quelle aller Quellen, täglich aktualisiert
   'https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',
-  // 2. Lokale CSV (falls vorhanden, kein Netz nötig)
-  'vix-daily.csv',
-  // 3. jsDelivr CDN (zuverlässig, schneller als GitHub-Raw)
+  // 2. jsDelivr CDN (zuverlässig, schneller als GitHub-Raw)
   'https://cdn.jsdelivr.net/gh/datasets/finance-vix@main/data/vix-daily.csv',
-  // 4. statically.io CDN
+  // 3. statically.io CDN
   'https://cdn.statically.io/gh/datasets/finance-vix/main/data/vix-daily.csv',
-  // 5. GitHub raw direkt
+  // 4. GitHub raw direkt
   TARGET_URL,
-  // 6. CORS-Proxies als letzte Notbremsen
+  // 5. CORS-Proxies als letzte Notbremsen
   'https://corsproxy.io/?url=' + TARGET_ENC,
   'https://api.allorigins.win/raw?url=' + TARGET_ENC
 ];
@@ -430,7 +427,6 @@ async function fetchCSV() {
       // Quellen-Label für UI
       let label = '';
       if (url.includes('cboe.com')) label = 'CBOE (offiziell)';
-      else if (url.startsWith('vix-daily')) label = 'Lokale CSV';
       else if (url.includes('jsdelivr')) label = 'jsDelivr CDN';
       else if (url.includes('statically')) label = 'Statically CDN';
       else if (url.includes('githubusercontent')) label = 'GitHub Raw';
