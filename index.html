@@ -394,17 +394,20 @@ function xhrGet(url, timeoutMs = 10000) {
 
 async function tryFetch(url) {
   // 1) Versuch: moderne fetch() API
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 10000);
   try {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
     const r = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
     clearTimeout(tid);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return await r.text();
   } catch (e) {
-    // Bei bestimmten Fehlern (object cloned / clone / fetch refused) wechsel zu XHR
+    clearTimeout(tid);
+    // AbortError = eigener 10s-Timeout → kein XHR-Retry (würde nochmal 10s warten)
+    if (e.name === 'AbortError') throw new Error('Timeout (>10s)');
+    // Bei Browser-Schutz-Fehlern (object cloned / TypeError) wechsel zu XHR
     const msg = (e && e.message) || '';
-    const useXhr = msg.includes('cloned') || msg.includes('clone') || e.name === 'AbortError' || e.name === 'TypeError';
+    const useXhr = msg.includes('cloned') || msg.includes('clone') || e.name === 'TypeError';
     if (!useXhr) throw e;
     console.log('[VIX] fetch() abgelehnt (' + msg + ') → wechsle zu XMLHttpRequest');
     // 2) Versuch: XMLHttpRequest
@@ -453,15 +456,15 @@ function determineRegime(Hpct, vix) {
 }
 
 function render(allRows, sourceLabel) {
-  const window = allRows.slice(-WINDOW_SIZE);
-  if (window.length < 2) throw new Error('Zu wenig Datenpunkte');
+  const dataWindow = allRows.slice(-WINDOW_SIZE);
+  if (dataWindow.length < 2) throw new Error('Zu wenig Datenpunkte');
 
   const changes = [];
-  for (let i = 1; i < window.length; i++) {
-    const prev = window[i-1].close;
-    const cur = window[i].close;
+  for (let i = 1; i < dataWindow.length; i++) {
+    const prev = dataWindow[i-1].close;
+    const cur = dataWindow[i].close;
     const deltaPct = (cur / prev - 1) * 100;
-    changes.push({ date: window[i].date, close: cur, prev, deltaPct, bin: getBin(deltaPct) });
+    changes.push({ date: dataWindow[i].date, close: cur, prev, deltaPct, bin: getBin(deltaPct) });
   }
 
   const binCounts = [0,0,0,0,0,0];
@@ -471,8 +474,8 @@ function render(allRows, sourceLabel) {
   const Hpct = (H / Hmax) * 100;
   const activeBins = binCounts.filter(c => c > 0).length;
 
-  const lastRow = window[window.length - 1];
-  const prevRow = window[window.length - 2];
+  const lastRow = dataWindow[dataWindow.length - 1];
+  const prevRow = dataWindow[dataWindow.length - 2];
   const vix = lastRow.close;
   const dailyDelta = vix - prevRow.close;
   const dailyDeltaPct = (vix / prevRow.close - 1) * 100;
@@ -505,12 +508,12 @@ function render(allRows, sourceLabel) {
 
   const binGrid = $('binGrid');
   const maxCount = Math.max(...binCounts, 1);
-  binGrid.innerHTML = '';
+  let binHtml = '';
   binCounts.forEach((cnt, i) => {
     const pct = (cnt / n * 100).toFixed(0);
     const barH = (cnt / maxCount * 60);
     const def = BIN_DEFS[i];
-    binGrid.innerHTML += `
+    binHtml += `
       <div class="bin-card" style="border-top: 2px solid ${def.color}40">
         <div class="bin-bar" style="height:0px;background:${def.color}22" data-h="${barH}"></div>
         <div class="bin-count" style="color:${def.color}">${cnt}</div>
@@ -519,6 +522,7 @@ function render(allRows, sourceLabel) {
         <div class="bin-label">${def.label}</div>
       </div>`;
   });
+  binGrid.innerHTML = binHtml;
   setTimeout(() => {
     document.querySelectorAll('.bin-bar').forEach(el => {
       el.style.height = el.dataset.h + 'px';
@@ -530,12 +534,12 @@ function render(allRows, sourceLabel) {
   $('formHpct').textContent = Hpct.toFixed(1) + '%';
 
   const tbody = document.querySelector('#histTable tbody');
-  tbody.innerHTML = '';
+  let tableHtml = '';
   [...changes].reverse().forEach(r => {
     const sgn = r.deltaPct >= 0 ? '+' : '';
     const cls = r.deltaPct >= 0 ? 'td-pos' : 'td-neg';
     const b = BIN_DEFS[r.bin];
-    tbody.innerHTML += `
+    tableHtml += `
       <tr>
         <td class="td-date">${fmtDate(r.date)}</td>
         <td class="td-vix">${r.close.toFixed(2)}</td>
@@ -543,12 +547,13 @@ function render(allRows, sourceLabel) {
         <td class="td-bin" style="color:${b.color}">${b.range} ${b.label}</td>
       </tr>`;
   });
+  tbody.innerHTML = tableHtml;
 
   const regRef = $('regimeRef');
-  regRef.innerHTML = '';
+  let regHtml = '';
   REGIME_DEFS.forEach(r => {
     const active = r.key === regime.key;
-    regRef.innerHTML += `
+    regHtml += `
       <div class="regime-row r-${r.key} ${active ? 'active' : ''}">
         <div class="regime-dot" style="background:${r.color};box-shadow:0 0 8px ${r.color}"></div>
         <div class="regime-row-name" style="color:${r.color}">${active ? '▶ ' : ''}${r.name}</div>
@@ -556,6 +561,7 @@ function render(allRows, sourceLabel) {
         <div class="regime-row-desc">${r.desc}</div>
       </div>`;
   });
+  regRef.innerHTML = regHtml;
 
   buildCSVDownload(changes, { vix, H, Hpct, regime, lastDate: lastRow.date });
 
