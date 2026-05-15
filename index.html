@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIX Entropie Dashboard | Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c14;
+    --surface: #0e1520;
+    --surface2: #141c2a;
+    --border: rgba(255,255,255,0.08);
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --vix-blue: #38bdf8;
+    --entropy-amber: #fb923c;
+    --danger-red: #ef4444;
+    --green: #4ade80;
+    --yellow: #facc15;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(56,189,248,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,0.03) 1px, transparent 1px);
+    background-size: 48px 48px; pointer-events: none; z-index: 0;
+  }
+  .container { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; padding: 40px 24px 80px; }
+  header { text-align: center; margin-bottom: 48px; }
+  .header-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 14px; }
+  h1 {
+    font-family: var(--mono); font-size: clamp(28px, 5vw, 46px); font-weight: 700;
+    letter-spacing: -0.02em; line-height: 1.1;
+    background: linear-gradient(135deg, #f1f5f9 30%, #94a3b8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    margin-bottom: 12px;
+  }
+  .header-sub { font-size: 14px; color: var(--muted); font-weight: 300; }
+  .header-sub span { color: var(--entropy-amber); }
+  .date-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 100px; padding: 6px 16px;
+    font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 20px;
+  }
+  .date-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 2s ease-in-out infinite; }
+  .date-badge.loading::before { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  .date-badge.error::before { background: var(--danger-red); box-shadow: 0 0 8px var(--danger-red); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .state-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; text-align: center; margin-bottom: 24px; }
+  .state-box.error { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--surface2); border-top-color: var(--vix-blue); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .alert { border-radius: 12px; padding: 20px 28px; display: flex; align-items: center; gap: 20px; margin-bottom: 32px; }
+  .alert.danger { background: linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05)); border: 1px solid rgba(239,68,68,0.4); }
+  .alert.elevated { background: linear-gradient(135deg, rgba(251,146,60,0.15), rgba(251,146,60,0.05)); border: 1px solid rgba(251,146,60,0.4); }
+  .alert.moderate { background: linear-gradient(135deg, rgba(250,204,21,0.12), rgba(250,204,21,0.04)); border: 1px solid rgba(250,204,21,0.35); }
+  .alert.low { background: linear-gradient(135deg, rgba(74,222,128,0.12), rgba(74,222,128,0.04)); border: 1px solid rgba(74,222,128,0.35); }
+  .alert.high { background: linear-gradient(135deg, rgba(192,0,0,0.2), rgba(192,0,0,0.05)); border: 1px solid rgba(192,0,0,0.5); }
+  .alert-icon { font-size: 32px; flex-shrink: 0; }
+  .alert-title { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+  .alert.danger .alert-title, .alert.high .alert-title { color: var(--danger-red); }
+  .alert.elevated .alert-title { color: var(--entropy-amber); }
+  .alert.moderate .alert-title { color: var(--yellow); }
+  .alert.low .alert-title { color: var(--green); }
+  .alert-desc { font-size: 14px; line-height: 1.5; }
+  .alert.danger .alert-desc, .alert.high .alert-desc { color: #fca5a5; }
+  .alert.elevated .alert-desc { color: #fdba74; }
+  .alert.moderate .alert-desc { color: #fde68a; }
+  .alert.low .alert-desc { color: #bbf7d0; }
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 700px) { .kpi-grid { grid-template-columns: 1fr; } .regime-card { flex-direction: column; text-align: center; } .regime-score { text-align: center; } .bin-grid { grid-template-columns: repeat(3, 1fr); } }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px 32px; position: relative; overflow: hidden; }
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .kpi-card.vix::before { background: linear-gradient(90deg, transparent, var(--vix-blue), transparent); }
+  .kpi-card.entropy::before { background: linear-gradient(90deg, transparent, var(--entropy-amber), transparent); }
+  .kpi-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .kpi-label-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .vix .kpi-label-dot { background: var(--vix-blue); box-shadow: 0 0 8px var(--vix-blue); }
+  .entropy .kpi-label-dot { background: var(--entropy-amber); box-shadow: 0 0 8px var(--entropy-amber); }
+  .kpi-value { font-family: var(--mono); font-size: clamp(42px, 8vw, 64px); font-weight: 700; line-height: 1; letter-spacing: -0.03em; margin-bottom: 8px; }
+  .vix .kpi-value { color: var(--vix-blue); }
+  .entropy .kpi-value { color: var(--entropy-amber); }
+  .kpi-sub { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .entropy-bar-wrap { margin-top: 20px; background: rgba(255,255,255,0.05); border-radius: 100px; height: 6px; overflow: hidden; }
+  .entropy-bar { height: 100%; border-radius: 100px; background: linear-gradient(90deg, #4ade80, #facc15, #fb923c, #ef4444); width: 0%; transition: width 1.4s cubic-bezier(0.16,1,0.3,1); }
+  .entropy-bar-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); font-family: var(--mono); margin-top: 6px; }
+  .regime-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
+  .regime-card.danger, .regime-card.high { background: linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.04)); border-color: rgba(239,68,68,0.35); }
+  .regime-card.elevated { background: linear-gradient(135deg, rgba(251,146,60,0.12), rgba(251,146,60,0.04)); border-color: rgba(251,146,60,0.35); }
+  .regime-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+  .regime-name { font-family: var(--mono); font-size: clamp(20px, 4vw, 30px); font-weight: 700; letter-spacing: 0.05em; }
+  .regime-card.danger .regime-name, .regime-card.high .regime-name { color: var(--danger-red); }
+  .regime-card.elevated .regime-name { color: var(--entropy-amber); }
+  .regime-card.moderate .regime-name { color: var(--yellow); }
+  .regime-card.low .regime-name { color: var(--green); }
+  .regime-desc { font-size: 14px; margin-top: 6px; line-height: 1.5; color: var(--muted); }
+  .regime-score { text-align: right; flex-shrink: 0; }
+  .regime-score-num { font-family: var(--mono); font-size: 40px; font-weight: 700; line-height: 1; }
+  .regime-card.danger .regime-score-num, .regime-card.high .regime-score-num { color: var(--danger-red); }
+  .regime-card.elevated .regime-score-num { color: var(--entropy-amber); }
+  .regime-card.moderate .regime-score-num { color: var(--yellow); }
+  .regime-card.low .regime-score-num { color: var(--green); }
+  .regime-score-label { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 4px; }
+  .section-title { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .bin-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 32px; }
+  .bin-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 8px; text-align: center; position: relative; overflow: hidden; }
+  .bin-bar { position: absolute; bottom: 0; left: 0; right: 0; transition: height 1.2s cubic-bezier(0.16,1,0.3,1); }
+  .bin-count { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1; position: relative; z-index: 1; }
+  .bin-pct { font-family: var(--mono); font-size: 11px; color: var(--muted); margin: 4px 0 8px; position: relative; z-index: 1; }
+  .bin-label { font-size: 10px; color: var(--muted); line-height: 1.3; position: relative; z-index: 1; }
+  .bin-range { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--text); margin-bottom: 2px; position: relative; z-index: 1; }
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 32px; max-height: 480px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 14px 20px; text-align: left; border-bottom: 1px solid var(--border); background: var(--surface2); position: sticky; top: 0; }
+  td { padding: 11px 20px; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .td-date { color: var(--muted); }
+  .td-vix { color: var(--text); font-weight: 700; }
+  .td-pos { color: var(--green); }
+  .td-neg { color: var(--danger-red); }
+  .td-bin { color: var(--muted); font-size: 11px; }
+  .download-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--surface); border: 1px solid rgba(74,222,128,0.25); border-radius: 12px; padding: 18px 24px; margin-bottom: 32px; }
+  .download-info { display: flex; align-items: center; gap: 14px; }
+  .download-icon { width: 40px; height: 40px; background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .download-title { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+  .download-meta { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .download-btn { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #4ade80, #22c55e); color: #0a1a0a; font-family: var(--mono); font-size: 12px; font-weight: 700; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; text-decoration: none; transition: all 0.2s; letter-spacing: 0.05em; }
+  .download-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(74,222,128,0.35); }
+  .formula-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-bottom: 32px; font-family: var(--mono); font-size: 13px; color: var(--muted); line-height: 2; }
+  .formula-box .hl { color: var(--entropy-amber); }
+  .formula-box .hl2 { color: var(--vix-blue); }
+  .regime-ref { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 48px; }
+  .regime-row { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+  .regime-row.active.r-danger, .regime-row.active.r-high { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.4); }
+  .regime-row.active.r-elevated { background: rgba(251,146,60,0.08); border-color: rgba(251,146,60,0.4); }
+  .regime-row.active.r-moderate { background: rgba(250,204,21,0.08); border-color: rgba(250,204,21,0.4); }
+  .regime-row.active.r-low { background: rgba(74,222,128,0.08); border-color: rgba(74,222,128,0.4); }
+  .regime-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .regime-row-name { font-family: var(--mono); font-size: 12px; font-weight: 700; width: 120px; flex-shrink: 0; }
+  .regime-row-ent { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 110px; flex-shrink: 0; }
+  .regime-row-desc { font-size: 13px; color: var(--muted); line-height: 1.4; }
+  .note-box { background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.15); border-radius: 10px; padding: 14px 20px; font-size: 13px; color: var(--muted); margin-bottom: 32px; line-height: 1.6; }
+  .note-box strong { color: var(--vix-blue); }
+  footer { text-align: center; font-size: 12px; color: var(--muted); line-height: 1.8; border-top: 1px solid var(--border); padding-top: 32px; }
+  footer a { color: var(--entropy-amber); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="header-label">// Live-Daten · GitHub VIX-Dataset</div>
+    <h1>VIX<br>ENTROPIE</h1>
+    <div class="header-sub">Frühwarnsystem für Marktstress nach <span>Thorsten Wegener</span></div>
+    <div class="date-badge loading" id="statusBadge">Lade VIX-Daten...</div>
+  </header>
+
+  <div id="loadingState" class="state-box">
+    <div class="spinner"></div>
+    <div style="color: var(--muted); font-family: var(--mono); font-size: 13px;">Lade aktuelle VIX-Daten...</div>
+  </div>
+
+  <div id="errorState" class="state-box error hidden">
+    <div style="font-size: 32px; margin-bottom: 12px;">⚠️</div>
+    <div style="color: var(--danger-red); font-family: var(--mono); font-weight: 700; margin-bottom: 8px;">Daten konnten nicht geladen werden</div>
+    <div id="errorMsg" style="color: var(--muted); font-size: 13px;"></div>
+  </div>
+
+  <div id="mainContent" class="hidden">
+
+    <div id="alertBox"></div>
+
+    <div class="section-title">Kernindikatoren</div>
+    <div class="kpi-grid">
+      <div class="kpi-card vix">
+        <div class="kpi-label"><span class="kpi-label-dot"></span>CBOE VIX · Schluss</div>
+        <div class="kpi-value" id="vixValue">—</div>
+        <div class="kpi-sub" id="vixSub">—</div>
+      </div>
+      <div class="kpi-card entropy">
+        <div class="kpi-label"><span class="kpi-label-dot"></span>Shannon-Entropie · 21T Rolling</div>
+        <div class="kpi-value" id="entropyValue">—</div>
+        <div class="kpi-sub" id="entropySub">—</div>
+        <div class="entropy-bar-wrap" style="margin-top:20px">
+          <div class="entropy-bar" id="entropyBar"></div>
+        </div>
+        <div class="entropy-bar-labels">
+          <span>LOW 0%</span><span>MODERATE 40%</span><span>ELEVATED 65%</span><span>HIGH 80%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="regime-card" id="regimeCard">
+      <div>
+        <div class="regime-label">Aktuelles Markt-Regime</div>
+        <div class="regime-name" id="regimeName">—</div>
+        <div class="regime-desc" id="regimeDesc">—</div>
+      </div>
+      <div class="regime-score">
+        <div class="regime-score-num" id="regimeBins">—</div>
+        <div class="regime-score-label">Bins aktiv</div>
+      </div>
+    </div>
+
+    <div class="section-title">Bin-Verteilung (VIX-Tagesveränderungen in %)</div>
+    <div class="bin-grid" id="binGrid"></div>
+
+    <div class="section-title">Entropie-Formel</div>
+    <div class="formula-box">
+      <span class="hl">H</span> = −Σ <span class="hl2">pᵢ</span> · log₂(<span class="hl2">pᵢ</span>) &nbsp;|&nbsp; i = 1…6 Bins &nbsp;|&nbsp; n = <span id="formN">—</span> tägliche Veränderungen<br>
+      <span class="hl">H%</span> = <span class="hl">H</span> / log₂(6) = <span id="formHval">—</span> / 2.5850 = <span class="hl" id="formHpct">—</span>
+    </div>
+
+    <div class="section-title">VIX Schlusskurse · 21-Tage-Fenster</div>
+    <div class="table-wrap">
+      <table id="histTable">
+        <thead>
+          <tr><th>Datum</th><th>VIX Schluss</th><th>Δ %</th><th>Bin-Klasse</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="section-title">Daten-Export</div>
+    <div class="download-bar">
+      <div class="download-info">
+        <div class="download-icon">📊</div>
+        <div>
+          <div class="download-title" id="csvFileName">vix_entropie.csv</div>
+          <div class="download-meta" id="csvMeta">CSV mit allen Werten und Bin-Zuordnung</div>
+        </div>
+      </div>
+      <a class="download-btn" id="csvDownload" download="vix_entropie.csv">↓ CSV</a>
+    </div>
+
+    <div class="note-box">
+      <strong>Methode:</strong> Tägliche prozentuale Veränderungen des VIX werden in 6 Klassen eingeteilt (von „Großer Crash" −10%+ bis „Großer Spike" +10%+). Die Shannon-Entropie misst, wie gleichverteilt diese Klassen sind. Hohe Entropie bei niedrigem VIX (Danger Zone) deutet auf erhöhte Markt-Unordnung trotz scheinbarer Ruhe hin.
+    </div>
+
+    <div class="section-title">Regime-Referenz</div>
+    <div class="regime-ref" id="regimeRef"></div>
+
+  </div>
+
+  <footer>
+    Primäre Datenquelle: <a href="https://www.cboe.com" target="_blank">CBOE</a> (offizielles VIX-Historikdataset, täglich aktualisiert)<br>
+    Fallback-Quellen: jsDelivr CDN · Statically · GitHub · CORS-Proxies<br>
+    Methode: Shannon-Entropie nach Wegener · 21-Tage-Rolling, 6 Bins über % Tagesveränderung · Keine Anlageberatung<br>
+    Seite zuletzt geändert: <span id="pageModified"></span>
+  </footer>
+
+</div>
+
+<script>
+"use strict";
+
+// Mehrere Datenquellen, der Reihe nach probiert. Erste, die antwortet, gewinnt.
+// CBOE selbst zuerst (offiziell, niemals geblockt), dann CDNs, dann Proxies.
+const TARGET_URL = 'https://raw.githubusercontent.com/datasets/finance-vix/main/data/vix-daily.csv';
+const TARGET_ENC = encodeURIComponent(TARGET_URL);
+
+const DATA_URLS = [
+  // 1. CBOE OFFIZIELL — Quelle aller Quellen, täglich aktualisiert, niemand blockt das
+  'https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',
+  // 2. Lokale CSV (falls vorhanden, kein Netz nötig)
+  'vix-daily.csv',
+  // 3. jsDelivr CDN (zuverlässig, schneller als GitHub-Raw)
+  'https://cdn.jsdelivr.net/gh/datasets/finance-vix@main/data/vix-daily.csv',
+  // 4. statically.io CDN
+  'https://cdn.statically.io/gh/datasets/finance-vix/main/data/vix-daily.csv',
+  // 5. GitHub raw direkt
+  TARGET_URL,
+  // 6. CORS-Proxies als letzte Notbremsen
+  'https://corsproxy.io/?url=' + TARGET_ENC,
+  'https://api.allorigins.win/raw?url=' + TARGET_ENC
+];
+const WINDOW_SIZE = 21;
+
+const BIN_DEFS = [
+  { range: '< −10%',     label: 'Großer Crash',  color: '#ef4444', test: d => d < -10 },
+  { range: '−10 … −3%',  label: 'Crash',         color: '#f97316', test: d => d < -3  },
+  { range: '−3 … 0%',    label: 'Leicht neg.',   color: '#facc15', test: d => d < 0   },
+  { range: '0 … +3%',    label: 'Leicht pos.',   color: '#86efac', test: d => d < 3   },
+  { range: '+3 … +10%',  label: 'Spike',         color: '#4ade80', test: d => d < 10  },
+  { range: '> +10%',     label: 'Großer Spike',  color: '#22d3ee', test: d => true    }
+];
+
+const REGIME_DEFS = [
+  { key: 'low',      name: 'LOW',          ent: '0–40%',          desc: 'Geordneter Markt mit klarer Richtung. Trend-Strategien funktionieren gut.',  color: '#4ade80' },
+  { key: 'moderate', name: 'MODERATE',     ent: '40–65%',         desc: 'Normale Bedingungen, leichte Unsicherheit, dominante Richtung erkennbar.', color: '#facc15' },
+  { key: 'elevated', name: 'ELEVATED',     ent: '65–80%',         desc: 'Erhöhte Unordnung, mehrere Bins aktiv. Positionsgrößen reduzieren.',         color: '#fb923c' },
+  { key: 'danger',   name: 'DANGER ZONE',  ent: '≥65% & VIX<22',  desc: 'Stille Oberfläche, wilde Strömungen darunter. Hedges aufstocken!',          color: '#ef4444' },
+  { key: 'high',     name: 'HIGH',         ent: '≥80%',           desc: 'Maximale Unordnung. Alle Ausgänge gleich wahrscheinlich. Höchste Vorsicht.', color: '#c00000' }
+];
+
+const $ = id => document.getElementById(id);
+const statusBadge = $('statusBadge');
+const loadingState = $('loadingState');
+const errorState = $('errorState');
+const mainContent = $('mainContent');
+
+function getBin(deltaPct) {
+  for (let i = 0; i < BIN_DEFS.length; i++) {
+    if (BIN_DEFS[i].test(deltaPct)) return i;
+  }
+  return BIN_DEFS.length - 1;
+}
+
+function shannonEntropy(counts) {
+  const n = counts.reduce((a,b) => a+b, 0);
+  if (n === 0) return { H: 0, n: 0 };
+  let H = 0;
+  for (const c of counts) {
+    if (c > 0) {
+      const p = c / n;
+      H -= p * Math.log2(p);
+    }
+  }
+  return { H, n };
+}
+
+function fmtDate(isoStr) {
+  // isoStr is YYYY-MM-DD
+  const [y, m, d] = isoStr.split('-');
+  return `${d}.${m}.${y}`;
+}
+
+function normalizeDate(raw) {
+  // Accept: MM/DD/YYYY, M/D/YYYY, YYYY-MM-DD
+  raw = raw.trim();
+  if (raw.includes('/')) {
+    const [m, d, y] = raw.split('/');
+    return `${y.padStart(4,'0')}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  if (raw.includes('-')) {
+    // assume YYYY-MM-DD already
+    const [y, m, d] = raw.split('-');
+    return `${y.padStart(4,'0')}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  return raw;
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) throw new Error('CSV leer');
+  console.log('[VIX] CSV hat', lines.length, 'Zeilen — verarbeite die letzten', Math.min(60, lines.length-1));
+  const header = lines[0].split(',').map(s => s.trim().toUpperCase());
+  const dateIdx = header.indexOf('DATE');
+  const closeIdx = header.indexOf('CLOSE');
+  if (dateIdx < 0 || closeIdx < 0) throw new Error('CSV ohne DATE/CLOSE Spalten');
+  // Performance: nur die letzten 60 Zeilen parsen (wir brauchen nur 21)
+  const dataLines = lines.slice(Math.max(1, lines.length - 60));
+  const rows = dataLines.map(l => {
+    const f = l.split(',');
+    const c = parseFloat(f[closeIdx]);
+    const date = normalizeDate(f[dateIdx] || '');
+    return { date, close: c };
+  }).filter(r => r.date && !isNaN(r.close) && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+  rows.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  return rows;
+}
+
+// Robust fetcher: probiert erst fetch(), bei "object can not be cloned" oder anderen
+// Browser-Schutz-Fehlern automatisch XMLHttpRequest (legacy, oft umgangen Privacy-Filter)
+function xhrGet(url, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.timeout = timeoutMs;
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(xhr.responseText);
+        } else {
+          reject(new Error('XHR HTTP ' + xhr.status));
+        }
+      };
+      xhr.onerror = () => reject(new Error('XHR Netzwerk-Fehler'));
+      xhr.ontimeout = () => reject(new Error('XHR Timeout'));
+      xhr.send();
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+async function tryFetch(url) {
+  // 1) Versuch: moderne fetch() API
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const r = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+    clearTimeout(tid);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.text();
+  } catch (e) {
+    // Bei bestimmten Fehlern (object cloned / clone / fetch refused) wechsel zu XHR
+    const msg = (e && e.message) || '';
+    const useXhr = msg.includes('cloned') || msg.includes('clone') || e.name === 'AbortError' || e.name === 'TypeError';
+    if (!useXhr) throw e;
+    console.log('[VIX] fetch() abgelehnt (' + msg + ') → wechsle zu XMLHttpRequest');
+    // 2) Versuch: XMLHttpRequest
+    return await xhrGet(url);
+  }
+}
+
+async function fetchCSV() {
+  const errors = [];
+  for (const url of DATA_URLS) {
+    try {
+      console.log('[VIX] Versuche:', url);
+      const startTime = Date.now();
+      const txt = await tryFetch(url);
+      const dur = Date.now() - startTime;
+      console.log('[VIX] ✓ Antwort in', dur, 'ms,', (txt.length/1024).toFixed(1), 'KB');
+      const rows = parseCSV(txt);
+      if (rows.length === 0) throw new Error('Keine gültigen Datenzeilen gefunden');
+      console.log('[VIX] ✓ Quelle:', url, '→', rows.length, 'verwertbare Zeilen');
+      // Quellen-Label für UI
+      let label = '';
+      if (url.includes('cboe.com')) label = 'CBOE (offiziell)';
+      else if (url.startsWith('vix-daily')) label = 'Lokale CSV';
+      else if (url.includes('jsdelivr')) label = 'jsDelivr CDN';
+      else if (url.includes('statically')) label = 'Statically CDN';
+      else if (url.includes('githubusercontent')) label = 'GitHub Raw';
+      else if (url.includes('corsproxy')) label = 'CORSproxy.io';
+      else if (url.includes('allorigins')) label = 'AllOrigins';
+      else label = 'Externe Quelle';
+      return { rows, sourceLabel: label, sourceUrl: url };
+    } catch (e) {
+      const msg = e.name === 'AbortError' ? 'Timeout (>10s)' : (e.message || e);
+      console.warn('[VIX] ✗ Fehlgeschlagen:', url, '→', msg);
+      errors.push(`${(url.split('/')[2] || 'lokal').substring(0,25)}: ${msg}`);
+    }
+  }
+  throw new Error('Alle ' + DATA_URLS.length + ' Datenquellen fehlgeschlagen.<br><br><strong>Details:</strong><br>' + errors.join('<br>'));
+}
+
+function determineRegime(Hpct, vix) {
+  if (Hpct >= 80) return REGIME_DEFS.find(r => r.key === 'high');
+  if (Hpct >= 65 && vix < 22) return REGIME_DEFS.find(r => r.key === 'danger');
+  if (Hpct >= 65) return REGIME_DEFS.find(r => r.key === 'elevated');
+  if (Hpct >= 40) return REGIME_DEFS.find(r => r.key === 'moderate');
+  return REGIME_DEFS.find(r => r.key === 'low');
+}
+
+function render(allRows, sourceLabel) {
+  const window = allRows.slice(-WINDOW_SIZE);
+  if (window.length < 2) throw new Error('Zu wenig Datenpunkte');
+
+  const changes = [];
+  for (let i = 1; i < window.length; i++) {
+    const prev = window[i-1].close;
+    const cur = window[i].close;
+    const deltaPct = (cur / prev - 1) * 100;
+    changes.push({ date: window[i].date, close: cur, prev, deltaPct, bin: getBin(deltaPct) });
+  }
+
+  const binCounts = [0,0,0,0,0,0];
+  changes.forEach(c => binCounts[c.bin]++);
+  const { H, n } = shannonEntropy(binCounts);
+  const Hmax = Math.log2(6);
+  const Hpct = (H / Hmax) * 100;
+  const activeBins = binCounts.filter(c => c > 0).length;
+
+  const lastRow = window[window.length - 1];
+  const prevRow = window[window.length - 2];
+  const vix = lastRow.close;
+  const dailyDelta = vix - prevRow.close;
+  const dailyDeltaPct = (vix / prevRow.close - 1) * 100;
+
+  const regime = determineRegime(Hpct, vix);
+
+  $('vixValue').textContent = vix.toFixed(2);
+  const sign = dailyDelta >= 0 ? '+' : '';
+  $('vixSub').textContent = `${fmtDate(lastRow.date)} · ${sign}${dailyDelta.toFixed(2)} (${sign}${dailyDeltaPct.toFixed(2)}%)`;
+
+  $('entropyValue').innerHTML = Hpct.toFixed(1) + '<span style="font-size:0.5em;opacity:0.6">%</span>';
+  $('entropySub').textContent = `H = ${H.toFixed(4)} bits · Hmax = ${Hmax.toFixed(4)} bits`;
+  setTimeout(() => { $('entropyBar').style.width = Math.min(100, Hpct).toFixed(1) + '%'; }, 200);
+
+  const card = $('regimeCard');
+  card.className = 'regime-card ' + regime.key;
+  $('regimeName').textContent = '▶ ' + regime.name;
+  $('regimeDesc').textContent = regime.desc;
+  $('regimeBins').textContent = activeBins + '/6';
+
+  const alertIcons = { low: '✅', moderate: 'ℹ️', elevated: '⚠️', danger: '⚡', high: '🚨' };
+  $('alertBox').innerHTML = `
+    <div class="alert ${regime.key}">
+      <div class="alert-icon">${alertIcons[regime.key]}</div>
+      <div>
+        <div class="alert-title">${regime.name}</div>
+        <div class="alert-desc">VIX ${vix.toFixed(2)} bei Entropie ${Hpct.toFixed(1)}% — ${regime.desc}</div>
+      </div>
+    </div>`;
+
+  const binGrid = $('binGrid');
+  const maxCount = Math.max(...binCounts, 1);
+  binGrid.innerHTML = '';
+  binCounts.forEach((cnt, i) => {
+    const pct = (cnt / n * 100).toFixed(0);
+    const barH = (cnt / maxCount * 60);
+    const def = BIN_DEFS[i];
+    binGrid.innerHTML += `
+      <div class="bin-card" style="border-top: 2px solid ${def.color}40">
+        <div class="bin-bar" style="height:0px;background:${def.color}22" data-h="${barH}"></div>
+        <div class="bin-count" style="color:${def.color}">${cnt}</div>
+        <div class="bin-pct">${pct}%</div>
+        <div class="bin-range">${def.range}</div>
+        <div class="bin-label">${def.label}</div>
+      </div>`;
+  });
+  setTimeout(() => {
+    document.querySelectorAll('.bin-bar').forEach(el => {
+      el.style.height = el.dataset.h + 'px';
+    });
+  }, 300);
+
+  $('formN').textContent = n;
+  $('formHval').textContent = H.toFixed(4);
+  $('formHpct').textContent = Hpct.toFixed(1) + '%';
+
+  const tbody = document.querySelector('#histTable tbody');
+  tbody.innerHTML = '';
+  [...changes].reverse().forEach(r => {
+    const sgn = r.deltaPct >= 0 ? '+' : '';
+    const cls = r.deltaPct >= 0 ? 'td-pos' : 'td-neg';
+    const b = BIN_DEFS[r.bin];
+    tbody.innerHTML += `
+      <tr>
+        <td class="td-date">${fmtDate(r.date)}</td>
+        <td class="td-vix">${r.close.toFixed(2)}</td>
+        <td class="${cls}">${sgn}${r.deltaPct.toFixed(2)}%</td>
+        <td class="td-bin" style="color:${b.color}">${b.range} ${b.label}</td>
+      </tr>`;
+  });
+
+  const regRef = $('regimeRef');
+  regRef.innerHTML = '';
+  REGIME_DEFS.forEach(r => {
+    const active = r.key === regime.key;
+    regRef.innerHTML += `
+      <div class="regime-row r-${r.key} ${active ? 'active' : ''}">
+        <div class="regime-dot" style="background:${r.color};box-shadow:0 0 8px ${r.color}"></div>
+        <div class="regime-row-name" style="color:${r.color}">${active ? '▶ ' : ''}${r.name}</div>
+        <div class="regime-row-ent">${r.ent}</div>
+        <div class="regime-row-desc">${r.desc}</div>
+      </div>`;
+  });
+
+  buildCSVDownload(changes, { vix, H, Hpct, regime, lastDate: lastRow.date });
+
+  statusBadge.className = 'date-badge';
+  statusBadge.textContent = 'Letzter Schluss: ' + fmtDate(lastRow.date) + (sourceLabel ? ' · ' + sourceLabel : '');
+
+  loadingState.classList.add('hidden');
+  mainContent.classList.remove('hidden');
+}
+
+function buildCSVDownload(changes, summary) {
+  const lines = [];
+  lines.push('# VIX Entropie Analyse');
+  lines.push(`# Stand: ${summary.lastDate}`);
+  lines.push(`# VIX: ${summary.vix.toFixed(2)}`);
+  lines.push(`# Shannon-Entropie: ${summary.H.toFixed(4)} bits (${summary.Hpct.toFixed(1)}%)`);
+  lines.push(`# Regime: ${summary.regime.name}`);
+  lines.push('');
+  lines.push('Datum,VIX_Schluss,Aenderung_Prozent,Bin_Klasse');
+  changes.forEach(r => {
+    const b = BIN_DEFS[r.bin];
+    lines.push(`${r.date},${r.close.toFixed(2)},${r.deltaPct.toFixed(4)},"${b.range} ${b.label}"`);
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = $('csvDownload');
+  a.href = url;
+  a.download = `vix_entropie_${summary.lastDate}.csv`;
+  $('csvFileName').textContent = `vix_entropie_${summary.lastDate}.csv`;
+  $('csvMeta').textContent = `${changes.length} Datenpunkte · automatisch aus Live-Daten generiert`;
+}
+
+async function init() {
+  // file:// detection
+  if (location.protocol === 'file:') {
+    loadingState.classList.add('hidden');
+    errorState.classList.remove('hidden');
+    $('errorMsg').innerHTML = '<strong>Die Seite läuft im <code>file://</code>-Modus.</strong><br>Browser blockieren externe Datenabrufe von lokalen Dateien aus Sicherheitsgründen.<br><br><strong>Lösung:</strong> Lade die Datei zu GitHub Pages, Netlify oder einem anderen Web-Host hoch — dort funktioniert sie sofort.';
+    statusBadge.className = 'date-badge error';
+    statusBadge.textContent = 'file:// blockiert Datenabrufe';
+    return;
+  }
+
+  try {
+    const { rows, sourceLabel } = await fetchCSV();
+    if (rows.length < WINDOW_SIZE) throw new Error(`Nur ${rows.length} Datenpunkte verfügbar (mindestens ${WINDOW_SIZE} nötig)`);
+    render(rows, sourceLabel);
+  } catch (err) {
+    console.error('[VIX] Fehler beim Laden:', err);
+    loadingState.classList.add('hidden');
+    errorState.classList.remove('hidden');
+    $('errorMsg').innerHTML = err.message + '<br><br><span style="color:#94a3b8; font-size:11px">Tipp: F12 öffnen → Console-Tab → Logs mit <code>[VIX]</code> zeigen genau, was passiert.</span>';
+    statusBadge.className = 'date-badge error';
+    statusBadge.textContent = 'Fehler beim Laden';
+  }
+}
+
+init();
+
+(function() {
+  const el = document.getElementById('pageModified');
+  if (!el) return;
+  const d = new Date(document.lastModified);
+  if (isNaN(d.getTime())) return;
+  const pad = n => String(n).padStart(2, '0');
+  el.textContent = `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+})();
+</script>
+</body>
+</html>
