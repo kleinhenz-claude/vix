@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wertpapier Portfolio Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e1a;--card:rgba(22,28,45,.85);--border:rgba(80,95,130,.35);
+  --txt:#e8edf5;--muted:#8b98b0;--blue:#5b9dff;--purple:#a78bfa;
+  --green:#34d399;--red:#f87171;--amber:#fbbf24;--pink:#f472b6;
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:radial-gradient(ellipse at top,#141c30 0%,#0a0e1a 55%);
+  color:var(--txt);min-height:100vh;padding:28px 18px;line-height:1.5;
+}
+.container{max-width:1500px;margin:0 auto}
+header{text-align:center;margin-bottom:26px}
+h1{font-size:2.4rem;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(120deg,var(--blue),var(--purple),var(--pink));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
+.subtitle{color:var(--muted);font-size:.95rem}
+.apibar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:14px 18px;margin:0 auto 18px;max-width:900px}
+.apibar input{flex:1;min-width:220px;background:#0d1322;border:1px solid var(--border);
+  color:var(--txt);padding:10px 14px;border-radius:9px;font-size:.9rem;font-family:monospace}
+.apibar input:focus{outline:none;border-color:var(--blue)}
+.btn{background:linear-gradient(120deg,var(--blue),var(--purple));color:#fff;border:none;
+  padding:10px 22px;border-radius:9px;font-weight:600;cursor:pointer;font-size:.9rem;transition:.2s;white-space:nowrap}
+.btn:hover{filter:brightness(1.12);transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn.ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.apihint{width:100%;text-align:center;color:var(--muted);font-size:.78rem;margin-top:2px}
+.apihint a{color:var(--blue);text-decoration:none}
+.legend{max-width:900px;margin:0 auto 16px;background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:14px 18px}
+.legend-title{font-size:.82rem;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}
+.legend-items{display:flex;flex-wrap:wrap;gap:14px}
+.legend-item{font-size:.82rem;color:var(--txt);display:flex;align-items:center;gap:7px}
+.legend-note{margin-top:11px;padding-top:10px;border-top:1px solid rgba(80,95,130,.18);font-size:.84rem;color:var(--muted)}
+.diag{max-width:900px;margin:0 auto 16px;background:#0a0f1c;border:1px solid var(--border);border-radius:12px;overflow:hidden;display:none}
+.diag.show{display:block}
+.diag-head{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;
+  background:rgba(80,95,130,.12);font-size:.85rem;font-weight:600}
+.diag-log{max-height:200px;overflow-y:auto;padding:12px 16px;font-family:monospace;font-size:.78rem;line-height:1.6}
+.diag-log .ok{color:var(--green)}.diag-log .err{color:var(--red)}
+.diag-log .warn{color:var(--amber)}.diag-log .info{color:var(--muted)}
+.progress-wrap{max-width:900px;margin:0 auto 16px;display:none}
+.progress-wrap.show{display:block}
+.progress-track{height:8px;background:rgba(80,95,130,.2);border-radius:5px;overflow:hidden}
+.progress-fill{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--green));transition:width .3s}
+.progress-label{text-align:center;color:var(--muted);font-size:.8rem;margin-top:6px}
+.banner{border-radius:12px;padding:15px 18px;margin-bottom:18px;font-size:.9rem;display:flex;gap:10px;align-items:flex-start}
+.banner.warn{background:rgba(248,113,113,.08);border-left:3px solid var(--red)}
+.banner.info{background:rgba(91,157,255,.08);border-left:3px solid var(--blue)}
+.banner b{color:var(--txt)}
+.banner .ic{font-size:1.1rem;flex-shrink:0}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:26px}
+.metric{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px}
+.metric .lbl{color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.06em}
+.metric .val{font-size:1.7rem;font-weight:700;margin-top:8px}
+.metric .sub{font-size:.82rem;margin-top:3px}
+.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
+.tabs{display:flex;gap:6px;margin-bottom:22px;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{padding:12px 20px;background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:.92rem;font-weight:600;border-bottom:2px solid transparent;white-space:nowrap;transition:.2s}
+.tab:hover{color:var(--txt)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.panel{display:none}
+.panel.active{display:block}
+.tablewrap{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px}
+.tablewrap h3{padding:16px 20px;font-size:1.05rem;border-bottom:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th{background:rgba(80,95,130,.12);padding:11px 14px;text-align:left;font-weight:600;color:var(--muted);
+  font-size:.76rem;text-transform:uppercase;letter-spacing:.04em}
+td{padding:10px 14px;border-bottom:1px solid rgba(80,95,130,.12)}
+tr:hover td{background:rgba(91,157,255,.04)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+th.num{text-align:right}
+.sym{font-weight:700;color:var(--txt)}
+.nm{color:var(--muted);font-size:.8rem}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:.74rem;font-weight:600;white-space:nowrap}
+.b-live{background:rgba(52,211,153,.16);color:var(--green)}
+.b-pdf{background:rgba(251,191,36,.16);color:var(--amber)}
+.b-err{background:rgba(248,113,113,.16);color:var(--red)}
+.b-low{background:rgba(52,211,153,.16);color:var(--green)}
+.b-mid{background:rgba(251,191,36,.16);color:var(--amber)}
+.b-high{background:rgba(248,113,113,.16);color:var(--red)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;transition:.2s}
+.card:hover{transform:translateY(-3px);border-color:rgba(91,157,255,.4)}
+.card h3{font-size:1.05rem;margin-bottom:12px;color:var(--blue)}
+.row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(80,95,130,.12);font-size:.88rem}
+.row:last-child{border-bottom:none}
+.row .k{color:var(--muted)}
+.bar{height:7px;background:rgba(80,95,130,.2);border-radius:4px;margin-top:8px;overflow:hidden}
+.bar > div{height:100%;border-radius:4px}
+h2{font-size:1.4rem;margin-bottom:16px;font-weight:700}
+.note{color:var(--muted);font-size:.82rem;margin-top:6px}
+footer{text-align:center;margin-top:44px;padding-top:22px;border-top:1px solid var(--border);color:var(--muted);font-size:.82rem}
+.method{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;font-size:.88rem;line-height:1.7}
+.method h4{color:var(--blue);margin:14px 0 6px}
+.method code{background:#0d1322;padding:2px 7px;border-radius:5px;font-size:.82rem;color:var(--amber)}
+@media(max-width:640px){h1{font-size:1.7rem}.metric .val{font-size:1.4rem}td,th{padding:8px 9px}}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <h1>Wertpapier Portfolio Dashboard</h1>
+  <p class="subtitle">Live-Kurse via Finnhub · PDF-Fallback (Stand 17.05.2026) · Risiko &amp; Optimierung</p>
+</header>
+
+<div class="apibar">
+  <input type="text" id="apiKey" placeholder="Finnhub API-Key" autocomplete="off" spellcheck="false">
+  <button class="btn" id="loadBtn">Live-Kurse laden</button>
+  <button class="btn ghost" id="pdfBtn">Nur PDF-Daten</button>
+  <button class="btn ghost" id="diagBtn">Diagnose</button>
+  <div class="apihint">Key kostenlos bei <a href="https://finnhub.io/register" target="_blank" rel="noopener">finnhub.io/register</a> · wird nur lokal genutzt.</div>
+</div>
+
+<div class="legend">
+  <div class="legend-title">Datenquelle je Position:</div>
+  <div class="legend-items">
+    <span class="legend-item"><span class="badge b-live">● Live</span> Aktueller Finnhub-Kurs</span>
+    <span class="legend-item"><span class="badge b-pdf">● PDF</span> Aus Export 17.05.2026 (nicht live)</span>
+    <span class="legend-item"><span class="badge b-err">● Fehler→PDF</span> Abruf fehlgeschlagen</span>
+  </div>
+  <div class="legend-note" id="liveSummary">Noch keine Live-Kurse geladen.</div>
+</div>
+
+<div class="diag" id="diagPanel">
+  <div class="diag-head"><span>🔍 Diagnose / API-Log</span>
+    <button class="btn ghost" style="padding:4px 12px;font-size:.78rem" id="clearLog">Leeren</button></div>
+  <div class="diag-log" id="diagLog"></div>
+</div>
+
+<div class="progress-wrap" id="progWrap">
+  <div class="progress-track"><div class="progress-fill" id="progFill"></div></div>
+  <div class="progress-label" id="progLabel">Lade…</div>
+</div>
+
+<div class="banner warn">
+  <span class="ic">⚠️</span>
+  <div><b>Daten-Diskrepanz in der Quelldatei:</b> Summe der Einzelpositionen ≠ Depot-Summen des Deckblatts
+  (Aktien: Positionen ≈ 364.250 € vs. Übersicht 318.633 €; Rohstoffe ≈ 206.983 € vs. 152.029 €).
+  Ursache vermutlich verschobene Spalten in der PDF. Beide Werte werden getrennt ausgewiesen.</div>
+</div>
+
+<div class="metrics" id="metrics"></div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="overview">Übersicht</button>
+  <button class="tab" data-tab="aktien">Aktien (24)</button>
+  <button class="tab" data-tab="rohstoffe">Rohstoffe (15)</button>
+  <button class="tab" data-tab="krypto">Krypto (4)</button>
+  <button class="tab" data-tab="etf">ETFs (6)</button>
+  <button class="tab" data-tab="risiko">Risiko</button>
+  <button class="tab" data-tab="methodik">Methodik</button>
+</div>
+
+<div id="overview" class="panel active"></div>
+<div id="aktien" class="panel"></div>
+<div id="rohstoffe" class="panel"></div>
+<div id="krypto" class="panel"></div>
+<div id="etf" class="panel"></div>
+<div id="risiko" class="panel"></div>
+<div id="methodik" class="panel"></div>
+
+<footer>
+  <p>Finnhub (live, wo verfügbar) + PDF-Export 17.05.2026 (Fallback). Informativ, keine Anlageberatung.</p>
+  <p style="margin-top:6px">Wechselkurse: USD/EUR 0,849 · AUD/EUR 0,6149 · GBP/EUR 1,1558 · CAD/EUR 0,6214</p>
+</footer>
+</div>
+
+<script>
+"use strict";
+
+// ====== KONFIG ======
+const FIXED_KEY = "d6j10p9r01qleu95tma0d6j10p9r01qleu95tmag";
+const FX = { USD:0.849, AUD:0.6149, GBP:1.1558, CAD:0.6214, EUR:1 };
+const FINNHUB_OK = new Set(["AAOI","AMD","AMZN","ASML","AVGO","BSX","GOOGL","HOOD",
+  "KTOS","LHX","MCD","NET","NFLX","MU","NBIS","SLN","WULF","AGI","CCJ","FNV"]);
+
+// ====== DATEN (real, PDF-Export 17.05.2026) ======
+const DATA = {
+  aktien:{ name:"Estably Depot 1 — Aktien", pdfSum:318633, positions:[
+    {s:"9TS.OLD",n:"TUBESOLAR AG",v:5,sh:100,pp:-99,pf:-457.80,ccy:"EUR"},
+    {s:"AAOI",n:"Applied Optoelectronics",v:7447,sh:50,pp:56,pf:2675.50,ccy:"USD"},
+    {s:"AMD",n:"Advanced Micro Devices",v:29587,sh:65,pp:74,pf:12562.45,ccy:"USD"},
+    {s:"AMZN",n:"Amazon.com",v:27268,sh:100,pp:12,pf:2958.50,ccy:"USD"},
+    {s:"ASML",n:"ASML Holding (ADR)",v:12736,sh:8,pp:95,pf:6198.56,ccy:"USD"},
+    {s:"AVGO",n:"Broadcom",v:8600,sh:20,pp:15,pf:1133.00,ccy:"USD"},
+    {s:"BSX",n:"Boston Scientific",v:5393,sh:100,pp:-16,pf:-1018.88,ccy:"USD"},
+    {s:"GOOGL",n:"Alphabet",v:32064,sh:80,pp:12,pf:3373.25,ccy:"USD"},
+    {s:"HOOD",n:"Robinhood Markets",v:15406,sh:200,pp:1,pf:103.10,ccy:"USD"},
+    {s:"IBM.DE",n:"IBM (XETRA)",v:4533,sh:23.3,pp:-9,pf:-474.01,ccy:"EUR"},
+    {s:"KTOS",n:"Kratos Defense",v:8684,sh:150,pp:-12,pf:-1176.00,ccy:"USD"},
+    {s:"LHX",n:"L3Harris Technologies",v:14982,sh:50,pp:-12.4,pf:-2120.50,ccy:"USD"},
+    {s:"LLY.DE",n:"Eli Lilly (XETRA)",v:8097,sh:10,pp:5,pf:383.22,ccy:"EUR"},
+    {s:"MCD",n:"McDonald's",v:9651,sh:35,pp:-2.9,pf:-284.05,ccy:"USD"},
+    {s:"MICC.AS",n:"Magnum Ice Cream (AEX)",v:5179,sh:411,pp:3.6,pf:182.07,ccy:"EUR"},
+    {s:"MU",n:"Micron Technology",v:59745,sh:80,pp:43,pf:18103.20,ccy:"USD"},
+    {s:"NBIS",n:"Nebius Group",v:47804,sh:270,pp:56,pf:17229.70,ccy:"USD"},
+    {s:"NET",n:"Cloudflare",v:9807,sh:50,pp:-2.7,pf:-270.00,ccy:"USD"},
+    {s:"NFLX",n:"Netflix",v:2625,sh:30,pp:-10.4,pf:-304.50,ccy:"USD"},
+    {s:"PO1.DE",n:"Performance One (XETRA)",v:15101,sh:8580,pp:5.7,pf:813.60,ccy:"EUR"},
+    {s:"RHM.DE",n:"Rheinmetall (XETRA)",v:12184,sh:10,pp:0.06,pf:6.98,ccy:"EUR"},
+    {s:"SLN",n:"Silence Therapeutics (ADR)",v:948,sh:136,pp:-5.2,pf:-51.96,ccy:"USD"},
+    {s:"SLNC.PA",n:"CoinShares Staked Solana (ETF)",v:17050,sh:2000,pp:0.05,pf:8.17,ccy:"EUR"},
+    {s:"WULF",n:"TeraWulf",v:9356,sh:400,pp:46,pf:2944.28,ccy:"USD"}
+  ]},
+  rohstoffe:{ name:"Estably Depot 3 — Rohstoffe", pdfSum:152029, positions:[
+    {s:"8GCA.F",n:"Glencore (FWB)",v:6500,sh:500,pp:21,pf:1142.51,ccy:"EUR",cat:"Diversifiziert"},
+    {s:"AGI",n:"Alamos Gold",v:8676,sh:200,pp:1,pf:114.32,ccy:"USD",cat:"Gold"},
+    {s:"AII.AX",n:"Almonty Industries (ASX)",v:2727,sh:100,pp:47,pf:867.00,ccy:"AUD",cat:"Wolfram"},
+    {s:"ALM",n:"Almonty Industries (NASDAQ)",v:38909,sh:1977,pp:16,pf:5498.11,ccy:"USD",cat:"Wolfram"},
+    {s:"CCJ",n:"Cameco",v:7005,sh:60,pp:1,pf:45.60,ccy:"USD",cat:"Uran"},
+    {s:"EQR.AX",n:"EQ Resources (ASX)",v:78000,sh:300000,pp:265,pf:56627.71,ccy:"AUD",cat:"Wolfram/Seltene Erden"},
+    {s:"FNV",n:"Franco-Nevada",v:2321,sh:10,pp:11,pf:229.80,ccy:"USD",cat:"Gold/Silber"},
+    {s:"GDX.PA",n:"VanEck Gold Miners ETF",v:2696,sh:30,pp:-7,pf:-214.07,ccy:"EUR",cat:"Gold-ETF"},
+    {s:"KRR.AX",n:"King River Resources (ASX)",v:2797,sh:99900,pp:16,pf:389.61,ccy:"AUD",cat:"Seltene Erden"},
+    {s:"MAT.AX",n:"Matsa Resources (ASX)",v:17600,sh:200000,pp:8,pf:1276.84,ccy:"AUD",cat:"Kupfer/Gold"},
+    {s:"ORN.AX",n:"Orion Minerals (ASX)",v:3000,sh:100000,pp:42,pf:890.00,ccy:"AUD",cat:"Kupfer/Zink"},
+    {s:"REMX.PA",n:"VanEck Rare Earth ETF",v:5287,sh:300,pp:12,pf:554.35,ccy:"EUR",cat:"Seltene Erden ETF"},
+    {s:"RXF.F",n:"Skeena Resources (FWB)",v:6690,sh:250,pp:29,pf:1522.78,ccy:"EUR",cat:"Gold/Silber"},
+    {s:"SLNC.PA",n:"CoinShares Staked Solana",v:8525,sh:1000,pp:3,pf:233.41,ccy:"EUR",cat:"Blockchain"},
+    {s:"TVN.AX",n:"Tivan Limited (ASX)",v:16250,sh:50000,pp:80,pf:7237.40,ccy:"AUD",cat:"Titan/Seltene Erden"}
+  ]},
+  krypto:{ name:"Robinhood — Krypto", pdfSum:52261, positions:[
+    {s:"BTC",n:"Bitcoin",v:38137,sh:0.5516,pp:0,pf:0,ccy:"USD",fhc:"BINANCE:BTCUSDT"},
+    {s:"SOL",n:"Solana",v:13583,sh:164.75,pp:0,pf:0,ccy:"USD",fhc:"BINANCE:SOLUSDT"},
+    {s:"ETH",n:"Ethereum",v:6,sh:0.0031,pp:0,pf:0,ccy:"USD",fhc:"BINANCE:ETHUSDT"},
+    {s:"MEGA",n:"MegaETH",v:535,sh:5386.3,pp:0,pf:0,ccy:"USD"}
+  ]},
+  etf:{ name:"Trading 212 — ETFs", pdfSum:401, positions:[
+    {s:"SCWX.DE",n:"SC MSCI AC World ex 1C",v:113.56,sh:10,pp:8,pf:8.38,ccy:"EUR"},
+    {s:"SDIP.L",n:"Global X SuperDividend",v:7.79,sh:1,pp:1.3,pf:0.10,ccy:"GBP"},
+    {s:"5MVL.DE",n:"iShares MSCI EM Value",v:83.43,sh:1,pp:19.6,pf:13.69,ccy:"EUR"},
+    {s:"AAKI.DE",n:"ARK AI & Robotics",v:18.70,sh:2,pp:12.4,pf:2.06,ccy:"EUR"},
+    {s:"ARKX.L",n:"ARK Space & Defence",v:57.73,sh:10,pp:14,pf:7.08,ccy:"USD"},
+    {s:"GDXJ.L",n:"VanEck Junior Gold Miners",v:119.39,sh:1,pp:5.1,pf:5.77,ccy:"GBP"}
+  ]}
+};
+
+// ====== STATE ======
+const liveState = {};
+const livePrice = {};
+const liveChg = {};
+
+// ====== HELPERS ======
+function $(id){ return document.getElementById(id); }
+function dbg(msg, cls){
+  const el=$('diagLog'); if(!el) return;
+  const t=new Date().toLocaleTimeString('de-DE');
+  el.innerHTML += '<div class="'+(cls||'info')+'">['+t+'] '+msg+'</div>';
+  el.scrollTop=el.scrollHeight;
+}
+function fmt(n,d){ d=d||0; return Number(n).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function eur(n){ return fmt(Math.round(n))+' €'; }
+function pct(n){ return (n>=0?'+':'')+fmt(n,2)+'%'; }
+function getKey(){ return ($('apiKey').value.trim() || FIXED_KEY).trim(); }
+
+function pdfPrice(p){
+  if(!p.sh || p.sh<=0) return null;
+  const fx=FX[p.ccy]||1;
+  return (p.v/p.sh)/fx;
+}
+function shownValue(p){
+  if(liveState[p.s]==='live' && livePrice[p.s] && p.sh>0){
+    const fx=FX[p.ccy]||1;
+    return livePrice[p.s]*fx*p.sh;
+  }
+  return p.v;
+}
+function riskClass(p,dk){
+  let base={aktien:2,rohstoffe:3,krypto:4,etf:1}[dk];
+  if(p.v>0 && p.sh>0){ const px=p.v/p.sh; if(px<1) base+=1; }
+  if(Math.abs(p.pp)>=50) base+=1;
+  if(base>=5) return {lbl:'Sehr hoch',cls:'b-high'};
+  if(base>=4) return {lbl:'Hoch',cls:'b-high'};
+  if(base>=3) return {lbl:'Erhöht',cls:'b-mid'};
+  if(base>=2) return {lbl:'Mittel',cls:'b-mid'};
+  return {lbl:'Niedrig',cls:'b-low'};
+}
+function depotTotals(dk){
+  const ps=DATA[dk].positions;
+  const v=ps.reduce((a,p)=>a+shownValue(p),0);
+  const pf=ps.reduce((a,p)=>a+p.pf,0);
+  const inv=v-pf;
+  return {v:v,pf:pf,ret:inv>0?pf/inv*100:0,n:ps.length,pdfSum:DATA[dk].pdfSum};
+}
+function badge(st){
+  if(st==='live') return '<span class="badge b-live">● Live</span>';
+  if(st==='err') return '<span class="badge b-err">● Fehler→PDF</span>';
+  return '<span class="badge b-pdf">● PDF</span>';
+}
+
+// ====== LIVE LOADING (isoliert) ======
+function withTimeout(promise, ms){
+  return Promise.race([promise, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);
+}
+async function fetchQuote(symbol, key){
+  const url='https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(symbol)+'&token='+encodeURIComponent(key);
+  let res;
+  try{ res=await withTimeout(fetch(url),9000); }
+  catch(e){ throw new Error(e.message==='timeout'?'timeout':'network'); }
+  if(res.status===401||res.status===403) throw new Error('auth');
+  if(res.status===429) throw new Error('rate');
+  if(!res.ok) throw new Error('http'+res.status);
+  let j;
+  try{ j=await res.json(); }catch(e){ throw new Error('badjson'); }
+  if(j && typeof j.c==='number' && j.c>0) return j;
+  throw new Error('empty');
+}
+async function loadLive(){
+  const key=getKey();
+  if(!key){ alert('Bitte einen Finnhub API-Key eingeben.'); return; }
+  $('diagPanel').classList.add('show');
+  dbg('Start Live-Abruf. Protokoll: '+location.protocol,'info');
+  if(location.protocol==='file:')
+    dbg('Hinweis: file:// kann direkten Abruf per CORS blockieren. Falls alles fehlschlägt → über lokalen Server öffnen.','warn');
+
+  const btn=$('loadBtn'); btn.disabled=true; btn.textContent='Lädt…';
+  const pw=$('progWrap'); pw.classList.add('show');
+  const pf=$('progFill'); const pl=$('progLabel');
+
+  const all=[];
+  for(const dk of Object.keys(DATA))
+    for(const p of DATA[dk].positions){
+      if(p.fhc || FINNHUB_OK.has(p.s)) all.push({p:p,fhSym:p.fhc||p.s});
+      else liveState[p.s]='pdf';
+    }
+  dbg(all.length+' Positionen für Live-Abruf.','info');
+
+  let done=0,ok=0,net=0,rate=0,auth=false;
+  for(let i=0;i<all.length;i++){
+    const it=all[i];
+    pl.textContent='Lade '+it.p.s+' … ('+(done+1)+'/'+all.length+')';
+    try{
+      if(i) await new Promise(r=>setTimeout(r,260));
+      const q=await fetchQuote(it.fhSym,key);
+      livePrice[it.p.s]=q.c; liveChg[it.p.s]=q.dp; liveState[it.p.s]='live'; ok++;
+      dbg('✓ '+it.p.s+': '+q.c+' '+it.p.ccy+' ('+(q.dp>=0?'+':'')+q.dp+'%)','ok');
+    }catch(e){
+      liveState[it.p.s]='err';
+      if(e.message==='auth'){ auth=true; dbg('✗ '+it.p.s+': Key ungültig (401/403). Abbruch.','err'); break; }
+      else if(e.message==='rate'){ rate++; dbg('✗ '+it.p.s+': Rate-Limit (429), warte 1,5s','warn'); await new Promise(r=>setTimeout(r,1500)); }
+      else if(e.message==='network'){ net++; dbg('✗ '+it.p.s+': Netzwerk/CORS blockiert','err'); }
+      else dbg('✗ '+it.p.s+': '+e.message,'err');
+    }
+    done++; pf.style.width=Math.round(done/all.length*100)+'%';
+  }
+
+  dbg('Fertig: '+ok+' live, '+net+' Netzwerk, '+rate+' Rate-Limit.', ok>0?'ok':'err');
+  if(net>0 && ok===0)
+    dbg('➡️ Alle direkten Abrufe blockiert (CORS). Lösung: Datei über lokalen Server öffnen — Terminal im Ordner: python3 -m http.server 8000 , dann http://localhost:8000/ aufrufen.','warn');
+
+  btn.disabled=false; btn.textContent='Live-Kurse laden';
+  pl.textContent = auth?'❌ Key ungültig.' : (net>0&&ok===0)?'❌ CORS-blockiert (siehe Diagnose).' : ok>0?'✅ '+ok+' Live-Kurse geladen.':'Keine Live-Daten.';
+  setTimeout(()=>pw.classList.remove('show'), (auth||net>0)?5000:2200);
+
+  updateLiveSummary();
+  renderAll();
+}
+function setAllPdf(){
+  for(const dk of Object.keys(DATA))
+    for(const p of DATA[dk].positions) liveState[p.s]='pdf';
+}
+function showPdfOnly(){ setAllPdf(); updateLiveSummary(); renderAll(); }
+function updateLiveSummary(){
+  const el=$('liveSummary'); if(!el) return;
+  const st=Object.values(liveState);
+  const live=st.filter(x=>x==='live').length;
+  const err=st.filter(x=>x==='err').length;
+  const pdf=st.filter(x=>x==='pdf').length;
+  if(live===0){
+    el.innerHTML='<b style="color:var(--amber)">Aktuell nur PDF-Daten.</b> Klicke „Live-Kurse laden" für aktuelle Kurse der US-Titel &amp; Krypto.';
+  }else{
+    const syms=Object.keys(liveState).filter(k=>liveState[k]==='live').sort().join(', ');
+    el.innerHTML='<b style="color:var(--green)">'+live+' live</b> · '+pdf+' PDF'+(err?' · <span style="color:var(--red)">'+err+' Fehler→PDF</span>':'')+
+      ' &nbsp;|&nbsp; '+new Date().toLocaleTimeString('de-DE')+'<br><span style="font-size:.78rem">Live: '+syms+'</span>';
+  }
+}
+
+// ====== RENDER ======
+function renderMetrics(){
+  const dks=['aktien','rohstoffe','krypto','etf'];
+  let v=0,pf=0; dks.forEach(function(dk){const t=depotTotals(dk);v+=t.v;pf+=t.pf;});
+  const ret=(v-pf)>0?pf/(v-pf)*100:0;
+  const live=Object.values(liveState).filter(x=>x==='live').length;
+  $('metrics').innerHTML=
+    '<div class="metric"><div class="lbl">Marktwert (Positionen)</div><div class="val">'+eur(v)+'</div><div class="sub neu">49 Positionen</div></div>'+
+    '<div class="metric"><div class="lbl">Gewinn / Verlust</div><div class="val '+(pf>=0?'pos':'neg')+'">'+(pf>=0?'+':'')+eur(pf)+'</div><div class="sub '+(pf>=0?'pos':'neg')+'">'+pct(ret)+' auf Einstand</div></div>'+
+    '<div class="metric"><div class="lbl">Übersichtssumme (PDF)</div><div class="val">523.323 €</div><div class="sub neu">lt. Deckblatt</div></div>'+
+    '<div class="metric"><div class="lbl">Live-Status</div><div class="val '+(live>0?'pos':'neu')+'">'+(live>0?live+' live':'PDF')+'</div><div class="sub neu">'+(live>0?'Finnhub aktiv':'keine Live-Daten')+'</div></div>';
+}
+function renderOverview(){
+  const dks=[['aktien','Aktien','var(--blue)'],['rohstoffe','Rohstoffe','var(--amber)'],['krypto','Krypto','var(--purple)'],['etf','ETFs','var(--green)']];
+  let tot=0; dks.forEach(function(d){tot+=depotTotals(d[0]).v;});
+  let cards='';
+  dks.forEach(function(d){
+    const dk=d[0],label=d[1],col=d[2];
+    const t=depotTotals(dk),share=t.v/tot*100;
+    const ps=DATA[dk].positions, liveN=ps.filter(p=>liveState[p.s]==='live').length;
+    const sb=liveN>0?'<span class="badge b-live">'+liveN+'/'+ps.length+' live</span>':'<span class="badge b-pdf">PDF</span>';
+    cards+='<div class="card"><h3 style="color:'+col+'">'+label+' '+sb+'</h3>'+
+      '<div class="row"><span class="k">Marktwert</span><span>'+eur(t.v)+'</span></div>'+
+      '<div class="row"><span class="k">Anteil</span><span>'+fmt(share,1)+' %</span></div>'+
+      '<div class="bar"><div style="width:'+share+'%;background:'+col+'"></div></div>'+
+      '<div class="row" style="margin-top:8px"><span class="k">G/V</span><span class="'+(t.pf>=0?'pos':'neg')+'">'+(t.pf>=0?'+':'')+eur(t.pf)+'</span></div>'+
+      '<div class="row"><span class="k">Rendite (Einstand)</span><span class="'+(t.ret>=0?'pos':'neg')+'">'+pct(t.ret)+'</span></div>'+
+      '<div class="row"><span class="k">Übersicht-Summe (PDF)</span><span class="neu">'+eur(t.pdfSum)+'</span></div></div>';
+  });
+  $('overview').innerHTML=
+    '<div class="banner info"><span class="ic">ℹ️</span><div>„Rendite (Einstand)" = Gewinn/Verlust gegenüber Kaufpreis (aus der Datei), <b>nicht</b> YTD. Echte YTD-Werte liefert der Finnhub-Free-Tier nicht zuverlässig.</div></div>'+
+    '<h2>Depot-Allokation</h2><div class="grid">'+cards+'</div>';
+}
+function renderTable(dk, extra){
+  const ps=DATA[dk].positions.slice().sort(function(a,b){return shownValue(b)-shownValue(a);});
+  const tot=ps.reduce((a,p)=>a+shownValue(p),0);
+  let rows='';
+  ps.forEach(function(p){
+    const st=liveState[p.s]||'pdf', rk=riskClass(p,dk), sv=shownValue(p), share=sv/tot*100, pp2=pdfPrice(p);
+    let priceCell;
+    if(st==='live' && livePrice[p.s]){
+      const lp=livePrice[p.s], chg=liveChg[p.s];
+      const chgTxt=(typeof chg==='number')?'<div class="nm '+(chg>=0?'pos':'neg')+'">'+(chg>=0?'▲':'▼')+' '+fmt(Math.abs(chg),2)+'% heute</div>':'';
+      priceCell='<td class="num"><span class="pos" style="font-weight:700">'+fmt(lp,2)+' '+p.ccy+'</span>'+chgTxt+(pp2?'<div class="nm">PDF: '+fmt(pp2,2)+' '+p.ccy+'</div>':'')+'</td>';
+    }else{
+      priceCell='<td class="num">'+(pp2?fmt(pp2,2)+' '+p.ccy:'—')+'<div class="nm">aus PDF</div></td>';
+    }
+    rows+='<tr><td><span class="sym">'+p.s+'</span><div class="nm">'+p.n+'</div></td>'+
+      priceCell+
+      '<td class="num">'+eur(sv)+'</td>'+
+      '<td class="num">'+fmt(share,1)+' %</td>'+
+      '<td class="num '+(p.pf>=0?'pos':'neg')+'">'+(p.pf>=0?'+':'')+eur(p.pf)+'</td>'+
+      '<td class="num '+(p.pp>=0?'pos':'neg')+'">'+pct(p.pp)+'</td>'+
+      (extra?'<td>'+(p.cat||'—')+'</td>':'')+
+      '<td><span class="badge '+rk.cls+'">'+rk.lbl+'</span></td>'+
+      '<td>'+badge(st)+'</td></tr>';
+  });
+  return '<div class="tablewrap"><h3>'+DATA[dk].name+'</h3><table><thead><tr>'+
+    '<th>Position</th><th class="num">Kurs</th><th class="num">Marktwert</th><th class="num">Anteil</th>'+
+    '<th class="num">G/V €</th><th class="num">Perf. (Einstand)</th>'+(extra?'<th>Kategorie</th>':'')+
+    '<th>Risiko</th><th>Quelle</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function renderRisiko(){
+  const dks=['aktien','rohstoffe','krypto','etf'];
+  const labels={aktien:'Aktien',rohstoffe:'Rohstoffe',krypto:'Krypto',etf:'ETFs'};
+  let cards='';
+  dks.forEach(function(dk){
+    const ps=DATA[dk].positions,t=depotTotals(dk);
+    const top=ps.slice().sort(function(a,b){return shownValue(b)-shownValue(a);})[0];
+    const conc=shownValue(top)/t.v*100;
+    const cc=conc>40?'neg':conc>20?'':'pos';
+    const mean=ps.reduce((a,p)=>a+p.pp,0)/ps.length;
+    const sd=Math.sqrt(ps.reduce((a,p)=>a+(p.pp-mean)*(p.pp-mean),0)/ps.length);
+    cards+='<div class="card"><h3>'+labels[dk]+'</h3>'+
+      '<div class="row"><span class="k">Positionen</span><span>'+t.n+'</span></div>'+
+      '<div class="row"><span class="k">Größte Position</span><span class="'+cc+'">'+top.s+' · '+fmt(conc,1)+' %</span></div>'+
+      '<div class="row"><span class="k">Streuung Perf. (σ)</span><span>'+fmt(sd,1)+' %</span></div>'+
+      '<div class="row"><span class="k">G/V gesamt</span><span class="'+(t.pf>=0?'pos':'neg')+'">'+(t.pf>=0?'+':'')+eur(t.pf)+'</span></div></div>';
+  });
+  let tot=0; dks.forEach(function(dk){tot+=depotTotals(dk).v;});
+  const allPos=[]; dks.forEach(function(dk){DATA[dk].positions.forEach(function(p){allPos.push(p);});});
+  const top6=allPos.slice().sort(function(a,b){return shownValue(b)-shownValue(a);}).slice(0,6);
+  let wr='';
+  top6.forEach(function(p){
+    const g=shownValue(p)/tot*100;
+    wr+='<tr><td><span class="sym">'+p.s+'</span><div class="nm">'+p.n+'</div></td>'+
+      '<td class="num">'+eur(shownValue(p))+'</td><td class="num '+(g>10?'neg':'')+'">'+fmt(g,1)+' %</td>'+
+      '<td>'+(g>10?'<span class="badge b-high">Klumpenrisiko</span>':g>5?'<span class="badge b-mid">Beobachten</span>':'<span class="badge b-low">OK</span>')+'</td></tr>';
+  });
+  $('risiko').innerHTML=
+    '<h2>Risiko nach Depot</h2>'+
+    '<div class="banner info"><span class="ic">ℹ️</span><div>Risikokennzahlen sind dokumentierte <b>Heuristiken</b> (Asset-Typ, Pennystock-Flag, Performance-Streuung) — keine echte historische Volatilität. Details im Tab „Methodik".</div></div>'+
+    '<div class="grid">'+cards+'</div>'+
+    '<div class="tablewrap"><h3>Größte Einzelpositionen im Gesamtportfolio</h3><table><thead><tr><th>Position</th><th class="num">Marktwert</th><th class="num">% Gesamt</th><th>Bewertung</th></tr></thead><tbody>'+wr+'</tbody></table></div>'+
+    '<div class="card" style="border-left:3px solid var(--green)"><h3 style="color:var(--green)">Aktionsplan zur Risikoreduktion</h3><div style="line-height:1.9;font-size:.9rem">'+
+    '<b>Sofort:</b> 9TS.OLD (−99 %) glattstellen → Verlustverrechnung.<br>'+
+    '<b>Klumpen:</b> EQR.AX ist die größte Einzelwette mit riesigem Buchgewinn — Teilverkauf sichert Gewinn &amp; senkt Pennystock-Abhängigkeit.<br>'+
+    '<b>Krypto:</b> Bitcoin = 73 % des Krypto-Depots → ggf. zugunsten ETH/Stablecoin ausbalancieren.<br>'+
+    '<b>Stabilisieren:</b> Trading 212 (401 €) mit breiten Welt-ETFs als ruhiges Rückgrat ausbauen.<br>'+
+    '<b>Verlierer prüfen:</b> LHX (−12,4 %), BSX (−16 %), KTOS (−12 %) fundamental bewerten oder Stop-Loss.</div></div>';
+}
+function renderMethodik(){
+  $('methodik').innerHTML=
+    '<h2>Methodik &amp; Datenherkunft</h2><div class="method">'+
+    '<h4>1. Datenquellen</h4><b>Live:</b> Finnhub <code>/quote</code>, direkt im Browser mit deinem Key. US-Titel + Krypto (Binance-Paare). <b>Fallback:</b> PDF-Export 17.05.2026 für alles, was der Free-Tier nicht liefert (.DE/.PA/.AS/.L/.AX, Robinhood).'+
+    '<h4>2. Status</h4><span class="badge b-live">● Live</span> aktueller Kurs · <span class="badge b-pdf">● PDF</span> Stand 17.05.2026 · <span class="badge b-err">● Fehler→PDF</span> Abruf fehlgeschlagen.'+
+    '<h4>3. Risikokennzahl (Heuristik)</h4>Basiswert: ETF 1, Aktie 2, Rohstoff 3, Krypto 4. <code>+1</code> wenn Kurs &lt; 1 € (Pennystock). <code>+1</code> wenn |Performance| ≥ 50 %. Summe → Niedrig (≤1) · Mittel (2) · Erhöht (3) · Hoch (4) · Sehr hoch (≥5). Bewusst eine Näherung, keine echte Volatilität/Sharpe/VaR.'+
+    '<h4>4. Konzentration</h4>Anteil größter Position je Depot &amp; gesamt. &gt;10 % = Klumpenrisiko, 5–10 % = beobachten.'+
+    '<h4>5. Performance-Streuung (σ)</h4>Standardabweichung der Einstands-Performance je Depot.'+
+    '<h4>6. Währung</h4>USD/EUR 0,849 · AUD/EUR 0,6149 · GBP/EUR 1,1558 · CAD/EUR 0,6214. Live-Kurse werden damit in Euro skaliert.'+
+    '<h4>7. Quelldatei-Diskrepanz</h4>Summe Einzelpositionen ≠ Deckblatt-Summen (Aktien 364.250 vs. 318.633 €; Rohstoffe 206.983 vs. 152.029 €). Vermutlich verschobene PDF-Spalten. Beide Werte ausgewiesen.'+
+    '<h4>8. Fehler-Handling</h4>9 s Timeout · 260 ms Drosselung · Erkennung von Key-Fehler (401/403), Rate-Limit (429), Netzwerk/CORS, ungültigem JSON. Jeder Fehler → automatischer PDF-Fallback. Anzeige wird rein aus internem Zustand erzeugt und bleibt auch bei komplettem API-Ausfall voll funktionsfähig.</div>';
+}
+function renderAll(){
+  try{
+    renderMetrics();
+    renderOverview();
+    $('aktien').innerHTML=renderTable('aktien',false);
+    $('rohstoffe').innerHTML=renderTable('rohstoffe',true);
+    $('krypto').innerHTML=renderTable('krypto',false)+
+      '<div class="banner warn" style="margin-top:16px"><span class="ic">⚠️</span><div><b>Krypto-Hinweis:</b> Bitcoin = 73 % des Krypto-Depots (Klumpenrisiko). Bestände bei Robinhood (keine eigenen Keys). G/V steht auf 0 € — vermutlich kein Einstandskurs hinterlegt.</div></div>';
+    $('etf').innerHTML=renderTable('etf',false)+
+      '<div class="banner info" style="margin-top:16px"><span class="ic">ℹ️</span><div>Trading 212 enthält ETFs, ist mit 401 € aber praktisch unbestückt — Potenzial als stabilisierendes Welt-ETF-Rückgrat.</div></div>';
+    renderRisiko();
+    renderMethodik();
+  }catch(e){
+    dbg('Render-Fehler: '+e.message,'err');
+    if(window.console) console.error(e);
+  }
+}
+
+// ====== EVENTS / INIT ======
+document.querySelectorAll('.tab').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+    $(btn.dataset.tab).classList.add('active');
+    btn.classList.add('active');
+  });
+});
+$('loadBtn').addEventListener('click', loadLive);
+$('pdfBtn').addEventListener('click', showPdfOnly);
+$('diagBtn').addEventListener('click', function(){ $('diagPanel').classList.toggle('show'); });
+$('clearLog').addEventListener('click', function(){ $('diagLog').innerHTML=''; });
+
+if(FIXED_KEY) $('apiKey').value=FIXED_KEY;
+setAllPdf();
+renderAll();
+updateLiveSummary();
+if(FIXED_KEY){ loadLive(); }
+</script>
+</body>
+</html>
