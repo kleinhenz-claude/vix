@@ -465,7 +465,7 @@ function classifyVix(v) { return VIX_REGIMES.find(r => v < r.max) || VIX_REGIMES
 async function loadVix() {
   const card = document.getElementById('vixCard');
   try {
-    const rows = await fetchYahooSeries('%5EVIX');
+    const rows = await fetchYahooSeries('^VIX');
     const m = computeMetrics(rows);
     const regime = classifyVix(m.last);
     const sign = m.dayChange >= 0 ? '+' : '';
@@ -622,7 +622,7 @@ function renderSection(key) {
         <div class="ticker-cell">
           <span class="ticker-chip">${d.t}</span>
           <button class="icon-btn spark-toggle" title="Mini-Chart">&#128200;</button>
-          <a class="icon-btn" href="https://finance.yahoo.com/quote/${encodeURIComponent(d.sym.replace('^','%5E'))}" target="_blank" rel="noopener" title="Yahoo Finance">&#8599;</a>
+          <a class="icon-btn" href="https://finance.yahoo.com/quote/${encodeURIComponent(d.sym)}" target="_blank" rel="noopener" title="Yahoo Finance">&#8599;</a>
           ${isCustom ? '<button class="icon-btn remove" title="Entfernen">&times;</button>' : ''}
         </div>
       </td>
