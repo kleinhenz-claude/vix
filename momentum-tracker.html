@@ -80,6 +80,7 @@
   .vix-desc{ font-size:14px; line-height:1.55; color:var(--text); opacity:0.85; margin-bottom:10px; max-width:620px; }
   .vix-chart-link{ font-size:12.5px; font-family:var(--mono); color:var(--blue); text-decoration:none; }
   .vix-chart-link:hover{ text-decoration:underline; }
+  .vix-source-note{ font-size:11.5px; font-family:var(--mono); color:var(--muted); margin-top:8px; }
   .vix-loading{ color:var(--muted); font-family:var(--mono); font-size:13px; }
 
   details.methodik{ background:var(--card); border:1px solid var(--border); border-radius:12px; margin-bottom:24px; box-shadow:var(--shadow); }
@@ -475,19 +476,30 @@ const VIX_REGIMES = [
 ];
 function classifyVix(v) { return VIX_REGIMES.find(r => v < r.max) || VIX_REGIMES[VIX_REGIMES.length - 1]; }
 
+const VIX_SOURCES = {
+  yahoo: { label: 'Yahoo Finance', chartUrl: 'https://finance.yahoo.com/quote/%5EVIX/chart' },
+  stooq: { label: 'Stooq (Fallback)', chartUrl: 'https://stooq.com/q/?s=' + encodeURIComponent('^vix') }
+};
+
 async function loadVix() {
   const card = document.getElementById('vixCard');
   try {
-    let rows;
+    let rows, source;
     try {
       rows = await fetchYahooSeries('^VIX');
+      source = 'yahoo';
     } catch (e) {
       console.warn('[Momentum] Yahoo VIX fehlgeschlagen (' + (e.message || e) + '), versuche Stooq-Fallback…');
       rows = await fetchStooqSeries('^vix');
+      source = 'stooq';
     }
     const m = computeMetrics(rows);
     const regime = classifyVix(m.last);
     const sign = m.dayChange >= 0 ? '+' : '';
+    const src = VIX_SOURCES[source];
+    const sourceNote = source === 'stooq'
+      ? `<div class="vix-source-note">&#9888;&#65039; Yahoo Finance nicht erreichbar &mdash; Daten von <b>${src.label}</b></div>`
+      : `<div class="vix-source-note">Quelle: ${src.label}</div>`;
     card.innerHTML = `
       <div class="vix-top">
         <span class="vix-dot" style="background:${regime.color};box-shadow:0 0 8px ${regime.color}"></span>
@@ -497,7 +509,8 @@ async function loadVix() {
       <div class="vix-name">CBOE Volatility Index (VIX)</div>
       <div class="regime-badge" style="color:${regime.color};background:${regime.color}1a;border:1px solid ${regime.color}55">${regime.label}</div>
       <div class="vix-desc">${regime.desc}</div>
-      <a class="vix-chart-link" href="https://finance.yahoo.com/quote/%5EVIX/chart" target="_blank" rel="noopener">Chart &#8599;</a>`;
+      <a class="vix-chart-link" href="${src.chartUrl}" target="_blank" rel="noopener">Chart (${src.label}) &#8599;</a>
+      ${sourceNote}`;
   } catch (e) {
     card.innerHTML = `<div class="vix-loading" style="color:var(--neg)">VIX konnte nicht geladen werden: ${e.message || e}</div>`;
   }
