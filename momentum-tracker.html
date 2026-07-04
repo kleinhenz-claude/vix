@@ -349,7 +349,7 @@
 })();
 
 /* ---------- Fetch helpers (fetch -> XHR -> CORS proxies) ---------- */
-function xhrGet(url, timeoutMs = 10000) {
+function xhrGet(url, timeoutMs = 7000) {
   return new Promise((resolve, reject) => {
     try {
       const xhr = new XMLHttpRequest();
@@ -366,7 +366,7 @@ function xhrGet(url, timeoutMs = 10000) {
 async function tryFetch(url) {
   try {
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const tid = setTimeout(() => ctrl.abort(), 7000);
     const r = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
     clearTimeout(tid);
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -399,6 +399,19 @@ async function fetchYahooSeries(symbol) {
     } catch (e) { lastErr = e; }
   }
   throw lastErr || new Error('Keine Daten für ' + symbol);
+}
+
+async function fetchStooqSeries(stooqSymbol) {
+  const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSymbol)}&i=d`;
+  const txt = await tryFetch(url);
+  const lines = txt.trim().split(/\r?\n/);
+  if (lines.length < 8) throw new Error('Stooq: zu wenige Datenpunkte');
+  const rows = lines.slice(1).map(line => {
+    const cols = line.split(',');
+    return { ts: null, close: parseFloat(cols[4]) };
+  }).filter(r => isFinite(r.close) && r.close > 0);
+  if (rows.length < 6) throw new Error('Stooq: keine gültigen Daten');
+  return rows;
 }
 
 async function mapLimit(items, limit, fn) {
@@ -465,7 +478,13 @@ function classifyVix(v) { return VIX_REGIMES.find(r => v < r.max) || VIX_REGIMES
 async function loadVix() {
   const card = document.getElementById('vixCard');
   try {
-    const rows = await fetchYahooSeries('^VIX');
+    let rows;
+    try {
+      rows = await fetchYahooSeries('^VIX');
+    } catch (e) {
+      console.warn('[Momentum] Yahoo VIX fehlgeschlagen (' + (e.message || e) + '), versuche Stooq-Fallback…');
+      rows = await fetchStooqSeries('^vix');
+    }
     const m = computeMetrics(rows);
     const regime = classifyVix(m.last);
     const sign = m.dayChange >= 0 ? '+' : '';
