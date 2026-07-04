@@ -409,7 +409,9 @@ async function fetchStooqSeries(stooqSymbol) {
   if (lines.length < 8) throw new Error('Stooq: zu wenige Datenpunkte');
   const rows = lines.slice(1).map(line => {
     const cols = line.split(',');
-    return { ts: null, close: parseFloat(cols[4]) };
+    // Datum als UTC-Mittag, damit toLocaleDateString nicht auf den Vortag zurückfällt
+    const ts = cols[0] ? Math.floor(new Date(cols[0] + 'T12:00:00Z').getTime() / 1000) : null;
+    return { ts, close: parseFloat(cols[4]) };
   }).filter(r => isFinite(r.close) && r.close > 0);
   if (rows.length < 6) throw new Error('Stooq: keine gültigen Daten');
   return rows;
@@ -438,6 +440,7 @@ function computeMetrics(rows) {
   const at = back => rows[Math.max(0, n - 1 - back)].close;
   return {
     last, prev,
+    lastTs: rows[n - 1].ts,
     dayChange: last - prev,
     dayChangePct: pctChange(last, prev),
     r1w: pctChange(last, at(5)),
@@ -445,6 +448,13 @@ function computeMetrics(rows) {
     r3m: pctChange(last, at(63)),
     closes: rows.slice(-40).map(r => r.close)
   };
+}
+
+function fmtDateFromTs(ts) {
+  if (ts == null) return null;
+  const d = new Date(ts * 1000);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
 }
 
 function fmtPct(v) {
@@ -488,18 +498,21 @@ async function loadVix() {
     try {
       rows = await fetchYahooSeries('^VIX');
       source = 'yahoo';
+      console.info('[Momentum] VIX von Yahoo Finance geladen, letzter Datenpunkt:', fmtDateFromTs(rows[rows.length-1].ts), rows[rows.length-1].close);
     } catch (e) {
       console.warn('[Momentum] Yahoo VIX fehlgeschlagen (' + (e.message || e) + '), versuche Stooq-Fallback…');
       rows = await fetchStooqSeries('^vix');
       source = 'stooq';
+      console.info('[Momentum] VIX von Stooq (Fallback) geladen, letzter Datenpunkt:', fmtDateFromTs(rows[rows.length-1].ts), rows[rows.length-1].close);
     }
     const m = computeMetrics(rows);
     const regime = classifyVix(m.last);
     const sign = m.dayChange >= 0 ? '+' : '';
     const src = VIX_SOURCES[source];
+    const asOf = fmtDateFromTs(m.lastTs);
     const sourceNote = source === 'stooq'
-      ? `<div class="vix-source-note">&#9888;&#65039; Yahoo Finance nicht erreichbar &mdash; Daten von <b>${src.label}</b></div>`
-      : `<div class="vix-source-note">Quelle: ${src.label}</div>`;
+      ? `<div class="vix-source-note">&#9888;&#65039; Yahoo Finance nicht erreichbar &mdash; Daten von <b>${src.label}</b>${asOf ? ' &middot; Stand: ' + asOf : ''}</div>`
+      : `<div class="vix-source-note">Quelle: ${src.label}${asOf ? ' &middot; Stand: ' + asOf : ''}</div>`;
     card.innerHTML = `
       <div class="vix-top">
         <span class="vix-dot" style="background:${regime.color};box-shadow:0 0 8px ${regime.color}"></span>
