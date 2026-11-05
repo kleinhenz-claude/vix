@@ -158,7 +158,7 @@
 <div class="container">
 
   <header>
-    <div class="header-label">// Live-Daten · CBOE &amp; CDN-Quellen</div>
+    <div class="header-label">// Live-Daten · CBOE</div>
     <h1>VIX<br>ENTROPIE</h1>
     <div class="header-sub">Frühwarnsystem für Marktstress nach <span>Thorsten Wegener</span></div>
     <div class="date-badge loading" id="statusBadge">Lade VIX-Daten...</div>
@@ -262,24 +262,20 @@
 <script>
 "use strict";
 
-// Mehrere Internet-Quellen, der Reihe nach probiert. Erste, die antwortet, gewinnt.
-const TARGET_URL = 'https://raw.githubusercontent.com/datasets/finance-vix/main/data/vix-daily.csv';
-const TARGET_ENC = encodeURIComponent(TARGET_URL);
+// Der Reihe nach probiert; die erste Quelle mit aktuellen Daten gewinnt.
+// datasets/finance-vix (GitHub) wird seit 22.09.2026 nicht mehr gepflegt – nur noch letzte Notlösung.
+const CBOE_URL = 'https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv';
+const CBOE_ENC = encodeURIComponent(CBOE_URL);
 
 const DATA_URLS = [
-  // 1. CBOE OFFIZIELL — Quelle aller Quellen, täglich aktualisiert
-  'https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',
-  // 2. jsDelivr CDN (zuverlässig, schneller als GitHub-Raw)
-  'https://cdn.jsdelivr.net/gh/datasets/finance-vix@main/data/vix-daily.csv',
-  // 3. statically.io CDN
-  'https://cdn.statically.io/gh/datasets/finance-vix/main/data/vix-daily.csv',
-  // 4. GitHub raw direkt
-  TARGET_URL,
-  // 5. CORS-Proxies als letzte Notbremsen
-  'https://corsproxy.io/?url=' + TARGET_ENC,
-  'https://api.allorigins.win/raw?url=' + TARGET_ENC
+  { url: 'https://rakete.trade/api/vix',                   label: 'CBOE via rakete.trade' },
+  { url: CBOE_URL,                                         label: 'CBOE (offiziell)' },
+  { url: 'https://corsproxy.io/?url=' + CBOE_ENC,          label: 'CBOE via corsproxy.io' },
+  { url: 'https://api.allorigins.win/raw?url=' + CBOE_ENC, label: 'CBOE via AllOrigins' },
+  { url: 'https://raw.githubusercontent.com/datasets/finance-vix/main/data/vix-daily.csv', label: 'GitHub Raw' }
 ];
 const WINDOW_SIZE = 21;
+const MAX_ALTER_TAGE = 6;
 
 const BIN_DEFS = [
   { range: '< −10%',     label: 'Großer Crash',  color: '#ef4444', test: d => d < -10 },
@@ -412,34 +408,32 @@ async function tryFetch(url) {
   }
 }
 
+function alterTage(iso) {
+  return (Date.now() - new Date(iso + 'T21:00:00Z').getTime()) / 86400000;
+}
+
 async function fetchCSV() {
   const errors = [];
-  for (const url of DATA_URLS) {
+  let veraltet = null;
+  for (const src of DATA_URLS) {
     try {
-      console.log('[VIX] Versuche:', url);
-      const startTime = Date.now();
-      const txt = await tryFetch(url);
-      const dur = Date.now() - startTime;
-      console.log('[VIX] ✓ Antwort in', dur, 'ms,', (txt.length/1024).toFixed(1), 'KB');
-      const rows = parseCSV(txt);
+      console.log('[VIX] Versuche:', src.url);
+      const rows = parseCSV(await tryFetch(src.url));
       if (rows.length === 0) throw new Error('Keine gültigen Datenzeilen gefunden');
-      console.log('[VIX] ✓ Quelle:', url, '→', rows.length, 'verwertbare Zeilen');
-      // Quellen-Label für UI
-      let label = '';
-      if (url.includes('cboe.com')) label = 'CBOE (offiziell)';
-      else if (url.includes('jsdelivr')) label = 'jsDelivr CDN';
-      else if (url.includes('statically')) label = 'Statically CDN';
-      else if (url.includes('githubusercontent')) label = 'GitHub Raw';
-      else if (url.includes('corsproxy')) label = 'CORSproxy.io';
-      else if (url.includes('allorigins')) label = 'AllOrigins';
-      else label = 'Externe Quelle';
-      return { rows, sourceLabel: label, sourceUrl: url };
+      const last = rows[rows.length - 1].date;
+      if (alterTage(last) <= MAX_ALTER_TAGE) {
+        console.log('[VIX] ✓ Quelle:', src.label, '→ Stand', last);
+        return { rows, sourceLabel: src.label, stale: false };
+      }
+      console.warn('[VIX] ✗ Veraltet:', src.label, '→ Stand', last);
+      errors.push(`${src.label}: veraltet (Stand ${fmtDate(last)})`);
+      if (!veraltet || last > veraltet.rows[veraltet.rows.length - 1].date) veraltet = { rows, sourceLabel: src.label, stale: true };
     } catch (e) {
-      const msg = e.name === 'AbortError' ? 'Timeout (>10s)' : (e.message || e);
-      console.warn('[VIX] ✗ Fehlgeschlagen:', url, '→', msg);
-      errors.push(`${(url.split('/')[2] || 'lokal').substring(0,25)}: ${msg}`);
+      console.warn('[VIX] ✗ Fehlgeschlagen:', src.label, '→', e.message || e);
+      errors.push(`${src.label}: ${e.message || e}`);
     }
   }
+  if (veraltet) return veraltet;
   throw new Error('Alle ' + DATA_URLS.length + ' Datenquellen fehlgeschlagen.<br><br><strong>Details:</strong><br>' + errors.join('<br>'));
 }
 
@@ -451,7 +445,7 @@ function determineRegime(Hpct, vix) {
   return REGIME_DEFS.find(r => r.key === 'low');
 }
 
-function render(allRows, sourceLabel) {
+function render(allRows, sourceLabel, stale) {
   const dataWindow = allRows.slice(-WINDOW_SIZE);
   if (dataWindow.length < 2) throw new Error('Zu wenig Datenpunkte');
 
@@ -561,8 +555,8 @@ function render(allRows, sourceLabel) {
 
   buildCSVDownload(changes, { vix, H, Hpct, regime, lastDate: lastRow.date });
 
-  statusBadge.className = 'date-badge';
-  statusBadge.textContent = 'Letzter Schluss: ' + fmtDate(lastRow.date) + (sourceLabel ? ' · ' + sourceLabel : '');
+  statusBadge.className = stale ? 'date-badge error' : 'date-badge';
+  statusBadge.textContent = (stale ? 'VERALTET – ' : '') + 'Letzter Schluss: ' + fmtDate(lastRow.date) + (sourceLabel ? ' · ' + sourceLabel : '');
 
   loadingState.classList.add('hidden');
   mainContent.classList.remove('hidden');
@@ -602,9 +596,9 @@ async function init() {
   }
 
   try {
-    const { rows, sourceLabel } = await fetchCSV();
+    const { rows, sourceLabel, stale } = await fetchCSV();
     if (rows.length < WINDOW_SIZE) throw new Error(`Nur ${rows.length} Datenpunkte verfügbar (mindestens ${WINDOW_SIZE} nötig)`);
-    render(rows, sourceLabel);
+    render(rows, sourceLabel, stale);
   } catch (err) {
     console.error('[VIX] Fehler beim Laden:', err);
     loadingState.classList.add('hidden');
