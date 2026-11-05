@@ -224,7 +224,7 @@
     <div class="table-wrap">
       <table id="histTable">
         <thead>
-          <tr><th>Datum</th><th>VIX Schluss</th><th>Δ %</th><th>Bin-Klasse</th></tr>
+          <tr><th>Datum</th><th>VIX Schluss</th><th>Δ</th><th>Bin-Klasse</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -252,9 +252,10 @@
   </div>
 
   <footer>
-    Primäre Datenquelle: <a href="https://www.cboe.com" target="_blank">CBOE</a> (offizielles VIX-Historikdataset, täglich aktualisiert)<br>
-    Fallback-Quellen: jsDelivr CDN · Statically CDN · GitHub Raw · CORS-Proxies<br>
-    Methode: Shannon-Entropie nach Wegener · 21-Tage-Rolling, 6 Bins über % Tagesveränderung · Keine Anlageberatung
+    Primäre Datenquelle: <a href="https://www.cboe.com/tradable-products/vix/" target="_blank">CBOE</a> (offizielles VIX-Historikdataset, über rakete.trade abgerufen)<br>
+    Fallback-Quellen: Yahoo Finance · CBOE direkt · CORS-Proxies · GitHub<br>
+    Methode: Shannon-Entropie nach Wegener · 21-Tage-Rolling, 6 Bins über % Tagesveränderung · Keine Anlageberatung<br>
+    Seite zuletzt geändert: <span id="pageModified"></span>
   </footer>
 
 </div>
@@ -269,6 +270,7 @@ const CBOE_ENC = encodeURIComponent(CBOE_URL);
 
 const DATA_URLS = [
   { url: 'https://rakete.trade/api/vix',                   label: 'CBOE via rakete.trade' },
+  { url: 'https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=6mo', label: 'Yahoo Finance API', yahoo: true },
   { url: CBOE_URL,                                         label: 'CBOE (offiziell)' },
   { url: 'https://corsproxy.io/?url=' + CBOE_ENC,          label: 'CBOE via corsproxy.io' },
   { url: 'https://api.allorigins.win/raw?url=' + CBOE_ENC, label: 'CBOE via AllOrigins' },
@@ -408,17 +410,34 @@ async function tryFetch(url) {
   }
 }
 
+function parseYahoo(txt) {
+  const json = JSON.parse(txt);
+  if (json.chart.error) throw new Error('Yahoo API Fehler: ' + json.chart.error.description);
+  const result = json.chart.result[0];
+  const timestamps = result.timestamp;
+  const closes = result.indicators.quote[0].close;
+  const pad = n => String(n).padStart(2, '0');
+  const rows = timestamps.map((ts, i) => {
+    const d = new Date(ts * 1000);
+    const date = `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+    return { date, close: closes[i] };
+  }).filter(r => r.close !== null && !isNaN(r.close));
+  rows.sort((a, b) => a.date < b.date ? -1 : 1);
+  return rows;
+}
+
 function alterTage(iso) {
   return (Date.now() - new Date(iso + 'T21:00:00Z').getTime()) / 86400000;
 }
 
-async function fetchCSV() {
+async function fetchData() {
   const errors = [];
   let veraltet = null;
   for (const src of DATA_URLS) {
     try {
       console.log('[VIX] Versuche:', src.url);
-      const rows = parseCSV(await tryFetch(src.url));
+      const txt = await tryFetch(src.url);
+      const rows = src.yahoo ? parseYahoo(txt) : parseCSV(txt);
       if (rows.length === 0) throw new Error('Keine gültigen Datenzeilen gefunden');
       const last = rows[rows.length - 1].date;
       if (alterTage(last) <= MAX_ALTER_TAGE) {
@@ -468,13 +487,12 @@ function render(allRows, sourceLabel, stale) {
   const prevRow = dataWindow[dataWindow.length - 2];
   const vix = lastRow.close;
   const dailyDelta = vix - prevRow.close;
-  const dailyDeltaPct = (vix / prevRow.close - 1) * 100;
 
   const regime = determineRegime(Hpct, vix);
 
   $('vixValue').textContent = vix.toFixed(2);
   const sign = dailyDelta >= 0 ? '+' : '';
-  $('vixSub').textContent = `${fmtDate(lastRow.date)} · ${sign}${dailyDelta.toFixed(2)} (${sign}${dailyDeltaPct.toFixed(2)}%)`;
+  $('vixSub').textContent = `${fmtDate(lastRow.date)} · ${sign}${dailyDelta.toFixed(2)}`;
 
   $('entropyValue').innerHTML = Hpct.toFixed(1) + '<span style="font-size:0.5em;opacity:0.6">%</span>';
   $('entropySub').textContent = `H = ${H.toFixed(4)} bits · Hmax = ${Hmax.toFixed(4)} bits`;
@@ -500,14 +518,12 @@ function render(allRows, sourceLabel, stale) {
   const maxCount = Math.max(...binCounts, 1);
   let binHtml = '';
   binCounts.forEach((cnt, i) => {
-    const pct = (cnt / n * 100).toFixed(0);
     const barH = (cnt / maxCount * 60);
     const def = BIN_DEFS[i];
     binHtml += `
       <div class="bin-card" style="border-top: 2px solid ${def.color}40">
         <div class="bin-bar" style="height:0px;background:${def.color}22" data-h="${barH}"></div>
         <div class="bin-count" style="color:${def.color}">${cnt}</div>
-        <div class="bin-pct">${pct}%</div>
         <div class="bin-range">${def.range}</div>
         <div class="bin-label">${def.label}</div>
       </div>`;
@@ -526,14 +542,15 @@ function render(allRows, sourceLabel, stale) {
   const tbody = document.querySelector('#histTable tbody');
   let tableHtml = '';
   [...changes].reverse().forEach(r => {
-    const sgn = r.deltaPct >= 0 ? '+' : '';
-    const cls = r.deltaPct >= 0 ? 'td-pos' : 'td-neg';
+    const delta = r.close - r.prev;
+    const sgn = delta >= 0 ? '+' : '';
+    const cls = delta >= 0 ? 'td-pos' : 'td-neg';
     const b = BIN_DEFS[r.bin];
     tableHtml += `
       <tr>
         <td class="td-date">${fmtDate(r.date)}</td>
         <td class="td-vix">${r.close.toFixed(2)}</td>
-        <td class="${cls}">${sgn}${r.deltaPct.toFixed(2)}%</td>
+        <td class="${cls}">${sgn}${delta.toFixed(2)}</td>
         <td class="td-bin" style="color:${b.color}">${b.range} ${b.label}</td>
       </tr>`;
   });
@@ -596,7 +613,7 @@ async function init() {
   }
 
   try {
-    const { rows, sourceLabel, stale } = await fetchCSV();
+    const { rows, sourceLabel, stale } = await fetchData();
     if (rows.length < WINDOW_SIZE) throw new Error(`Nur ${rows.length} Datenpunkte verfügbar (mindestens ${WINDOW_SIZE} nötig)`);
     render(rows, sourceLabel, stale);
   } catch (err) {
@@ -610,6 +627,15 @@ async function init() {
 }
 
 init();
+
+(function() {
+  const el = document.getElementById('pageModified');
+  if (!el) return;
+  const d = new Date(document.lastModified);
+  if (isNaN(d.getTime())) return;
+  const pad = n => String(n).padStart(2, '0');
+  el.textContent = `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+})();
 </script>
 </body>
 </html>
